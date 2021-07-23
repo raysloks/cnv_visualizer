@@ -1,0 +1,8 @@
+body {
+    margin: 0;
+    padding: 0;
+}
+
+.canvas_cursor_text {
+    cursor: text;
+}

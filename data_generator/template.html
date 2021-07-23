@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <meta http-equiv='X-UA-Compatible' content='IE=edge'>
+    <title>CNV Visualizer</title>
+    <meta name='viewport' content='width=device-width, initial-scale=1'>
+    <link rel='stylesheet' type='text/css' media='screen' href='../../../../data_viewer/main.css'>
+    <script src='../../../../data_viewer/main.js'></script>
+</head>
+<body>
+    <h1>%% title %%</h1>
+    <script>
+        let chromosome_names = [];
+        let chromosome_offsets = [];
+        let chromosome_sizes = [];
+		%% for chr in chromosomes
+		chromosome_names.push("%% chr.name %%");
+		chromosome_offsets.push(%% chr.offset %%);
+		chromosome_sizes.push(%% chr.size %%);
+		%% end
+    </script>
+    <canvas id="view_canvas" class="canvas_cursor_text" width="1600px" height="400px"></canvas>
+</body>
+</html>
