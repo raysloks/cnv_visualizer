@@ -4,12 +4,12 @@
 
 #include "DocumentTemplate.h"
 
-void GenomeData::save(const std::string& path) const
+void GenomeData::save(const std::string& path, const std::string& template_path) const
 {
-	std::ifstream is("test_data_generator/template.html");
+	std::ifstream is(template_path);
 	DocumentTemplate doc(is);
 
-	doc.data["title"] = "TITLE";
+	doc.data["title"] = name;
 	for (size_t i = 0; i < chromosomes.size(); ++i)
 	{
 		std::string chr_var = "chromosomes[" + std::to_string(i) + "].";

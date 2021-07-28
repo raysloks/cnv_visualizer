@@ -11,6 +11,9 @@ while (bin_sizes[bin_sizes.length - 1] < max_bin_size) {
 let chunk_size = 2048;
 
 let resolution_modifier = 1.95;
+let initial_view_margin = 1.2;
+
+let chr = {};
 
 let chromosome_index = 0;
 let screen_to_real = max_bin_size;
@@ -18,9 +21,9 @@ let focus = 0;
 
 let current_bin_size = max_bin_size;
 
-let last_chromosome_index = 0;
-let last_screen_to_real = 0;
-let last_focus = 0;
+let last_chromosome_index;
+let last_screen_to_real;
+let last_focus;
 
 let fresh_chunk_fetched = true;
 
@@ -29,6 +32,7 @@ let chunks = {};
 window.addEventListener('keydown', key_down_handler);
 window.addEventListener('keyup', key_up_handler);
 window.addEventListener('blur', blur_handler);
+window.addEventListener('hashchange', hash_change_handler);
 
 let keys_down = {};
 
@@ -55,9 +59,17 @@ function blur_handler(e) {
 	zoom_area_end = null;
 }
 
+function hash_change_handler(e) {
+	if (get_hash_from_state() != window.location.hash) {
+		set_state_from_hash(window.location.hash);
+		window.location.hash = get_hash_from_state();
+	}
+}
+
 let zoom_area_start = null;
 let zoom_area_end = null;
 let last_zoom_area_end = null;
+let view_mouse_x = null;
 
 let use_smooth_zoom = true;
 let smooth_zoom_delay = 0.5;
@@ -79,48 +91,104 @@ function on_mouse_up_canvas(e) {
 
 	zoom_area_end = (e.offsetX - e.target.width * 0.5) * screen_to_real + focus;
 
-	let zoom_area_left = Math.min(zoom_area_start, zoom_area_end);
-	let zoom_area_right = Math.max(zoom_area_start, zoom_area_end);
-	let zoom_area_width = zoom_area_right - zoom_area_left;
-	let zoom_area_midpoint = (zoom_area_left + zoom_area_right) * 0.5;
-
-	if (zoom_area_width / screen_to_real > 2) {
-		if (use_smooth_zoom) {
-			smooth_zoom_target_focus = zoom_area_midpoint;
-			smooth_zoom_target_screen_to_real = zoom_area_width / e.target.width;
-			smooth_zoom_remaining_delay = smooth_zoom_delay;
-		} else {
-			focus = zoom_area_midpoint;
-			screen_to_real = zoom_area_width / e.target.width;
-		}
-	}
+	perform_zoom(zoom_area_start, zoom_area_end);
 
 	zoom_area_start = null;
 	zoom_area_end = null;
 }
 
 function on_mouse_move(e) {
+	const canvas = document.getElementById("view_canvas");
+	view_mouse_x = e.clientX - canvas.getBoundingClientRect().left;
 	if (zoom_area_start === null)
 		return;
-
-	const canvas = document.getElementById("view_canvas");
 	zoom_area_end = (e.clientX - canvas.getBoundingClientRect().left - canvas.width * 0.5) * screen_to_real + focus;
 }
 
-function check_update() {
-	let needed_bin_size = screen_to_real * resolution_modifier;
-	current_bin_size = base_bin_size;
-	for (let i = 0; i < bin_sizes.length; ++i) {
-		if (bin_sizes[i] <= needed_bin_size)
-			current_bin_size = bin_sizes[i];
-		else
-			break;
+function perform_zoom(start, end, smooth) {
+	let zoom_area_left = Math.min(start, end);
+	let zoom_area_right = Math.max(start, end);
+	let zoom_area_width = zoom_area_right - zoom_area_left;
+	let zoom_area_midpoint = (zoom_area_left + zoom_area_right) * 0.5;
+
+	const canvas = document.getElementById("view_canvas");
+
+	smooth = smooth ?? use_smooth_zoom;
+
+	if (zoom_area_width / screen_to_real >= 1) {
+		if (smooth) {
+			smooth_zoom_target_focus = zoom_area_midpoint;
+			smooth_zoom_target_screen_to_real = zoom_area_width / canvas.width;
+			smooth_zoom_remaining_delay = smooth_zoom_delay;
+		} else {
+			focus = zoom_area_midpoint;
+			screen_to_real = zoom_area_width / canvas.width;
+		}
 	}
+}
+
+function get_start_and_end() {
+	const canvas = document.getElementById("view_canvas");
+	let half = screen_to_real * canvas.width * 0.5;
+	return [focus - half, focus + half];
+}
+
+function get_hash_from_state() {
+	let hash = "#" + chromosome_names[chromosome_index];
+	const [start, end] = get_start_and_end();
+	if (start > chromosome_offsets[chromosome_index] || end < chromosome_sizes[chromosome_index] + chromosome_offsets[chromosome_index])
+		hash += ":" + Math.floor(start) + "-" + Math.floor(end);
+	return hash;
+}
+
+function set_state_from_hash(hash) {
+	let re = /#([^:]+)(:(-?\d+)-(\d+))?/;
+	let matches = hash.match(re);
+	if (matches) {
+		chromosome_index = chromosome_names.findIndex(name => name == matches[1]);
+		const same_index = chromosome_index == chr.index;
+		if (matches[2])
+			perform_zoom(matches[3], matches[4], same_index && undefined);
+		else {
+			const canvas = document.getElementById("view_canvas");
+			let midpoint = chromosome_offsets[chromosome_index] + chromosome_sizes[chromosome_index] * 0.5;
+			let half_size = chromosome_sizes[chromosome_index] * initial_view_margin * 0.5;
+			perform_zoom(midpoint - half_size, midpoint + half_size, same_index && undefined);
+		}
+	}
+}
+
+function check_update() {
+
 	if (last_chromosome_index != chromosome_index 
 		|| last_screen_to_real != screen_to_real 
 		|| last_focus != focus 
-		|| fresh_chunk_fetched
+		|| fresh_chunk_fetched 
 		|| last_zoom_area_end != zoom_area_end) {
+
+		const canvas = document.getElementById("view_canvas");
+
+		if (canvas.width != window.innerWidth)
+			canvas.width = window.innerWidth;
+
+		if (last_chromosome_index != chromosome_index) {
+			document.getElementById("chromosome_dropdown_select").selectedIndex = chromosome_index;
+			let chromosome_dropdown_current = document.getElementById("chromosome_dropdown_current");
+			chromosome_dropdown_current.innerHTML = chromosome_names[chromosome_index];
+			chromosome_dropdown_current.href = "#" + chromosome_names[chromosome_index];
+		}
+
+		let hash = get_hash_from_state();
+		if (hash != undefined && hash != window.location.hash)
+			window.location.hash = hash;
+		let current_chromosome_dropdown_a = document.getElementById("chromosome_dropdown_content").children[chromosome_index];
+		if (current_chromosome_dropdown_a.href != hash)
+			current_chromosome_dropdown_a.href = hash;
+
+		chr.index = chromosome_index;
+		chr.name = chromosome_names[chr.index];
+		chr.offset = chromosome_offsets[chr.index];
+		chr.size = chromosome_sizes[chr.index];
 
 		last_chromosome_index = chromosome_index;
 		last_screen_to_real = screen_to_real;
@@ -183,56 +251,98 @@ function on_animation_frame(timestamp) {
 	check_update();
 }
 
-let last_chromosome_name;
+// very temp initialization
+let views = [
+	{
+		type: "chromosome",
+		height: 250,
+		clips: [
+			{
+				height: 50,
+				data: [
+					{
+						key: "log2_density",
+						y_offset: 5,
+						y_scale: 40
+					}
+				]
+			},
+			{
+				height: 200,
+				data: [
+					{
+						key: "log2_min",
+						y_offset: 120,
+						y_scale: 30
+					},
+					{
+						key: "log2_mean",
+						y_offset: 120,
+						y_scale: 30
+					},
+					{
+						key: "log2_max",
+						y_offset: 120,
+						y_scale: 30
+					}
+				]
+			}
+		]
+	},
+	{
+		type: "overview",
+		height: 80
+	}
+];
 
 function render(render_bin_size) {
 	const canvas = document.getElementById("view_canvas");
 	const ctx = canvas.getContext("2d");
 
-	let current_chromosome = chromosome_names[chromosome_index];
-	if (current_chromosome != last_chromosome_name) {
-		document.getElementsByTagName("H1")[0].innerHTML = current_chromosome;
-		last_chromosome_name = current_chromosome;
+	if (canvas.width != window.innerWidth)
+		canvas.width = window.innerWidth;
+
+	if (render_bin_size === undefined) {
+		
+		let needed_bin_size = screen_to_real * resolution_modifier;
+		current_bin_size = base_bin_size;
+		for (let i = 0; i < bin_sizes.length; ++i) {
+			if (bin_sizes[i] <= needed_bin_size)
+				current_bin_size = bin_sizes[i];
+			else
+				break;
+		}
+
+		render_bin_size = current_bin_size;
 	}
 
-	if (render_bin_size === undefined)
-		render_bin_size = current_bin_size;
-
-	// maybe we should unify log2_offset and baf_offset
-	let chr_offset = chromosome_offsets[chromosome_index];
-	let chr_size = chromosome_sizes[chromosome_index];
-	let max_chunk_index = Math.floor(chr_size / (chunk_size * render_bin_size));
+	let max_chunk_index = Math.floor(chr.size / (chunk_size * render_bin_size));
 
 	let visible_chunks = [];
-	let first_index = Math.floor((focus - canvas.width * 0.5 * screen_to_real - chr_offset) / (chunk_size * render_bin_size));
+	let first_index = Math.floor((focus - canvas.width * 0.5 * screen_to_real - chr.offset) / (chunk_size * render_bin_size));
 	first_index = Math.max(0, first_index);
-	let last_index = Math.floor((focus + canvas.width * 0.5 * screen_to_real - chr_offset) / (chunk_size * render_bin_size));
+	let last_index = Math.floor((focus + canvas.width * 0.5 * screen_to_real - chr.offset) / (chunk_size * render_bin_size));
 	last_index = Math.min(max_chunk_index, last_index);
 	for (let i = first_index; i <= last_index; ++i) {
-		visible_chunks.push(get_chunk(current_chromosome, render_bin_size, i));
+		visible_chunks.push(get_chunk(chr.name, render_bin_size, i));
 	}
 
 	if (first_index > 0) {
 		let look_ahead_index = first_index - 1;
-		get_chunk(current_chromosome, render_bin_size, look_ahead_index);
+		get_chunk(chr.name, render_bin_size, look_ahead_index);
 	}
 	if (last_index < max_chunk_index) {
 		let look_ahead_index = last_index + 1;
-		get_chunk(current_chromosome, render_bin_size, look_ahead_index);
+		get_chunk(chr.name, render_bin_size, look_ahead_index);
 	}
 
 	for (let i = 0; i < visible_chunks.length; ++i) {
 		if (visible_chunks[i] == null) {
-			// (old todo) partition the rendering to prevent entire view from dropping to a lower resolution
-			// fixed by using look ahead
 			if (render_bin_size < max_bin_size)
 				render(render_bin_size * 2);
 			return;
 		}
 	}
-
-	if (canvas.width != window.innerWidth)
-		canvas.width = window.innerWidth;
 
 	ctx.setTransform(1, 0, 0, 1, 0, 0);
 	ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -255,20 +365,92 @@ function render(render_bin_size) {
 
 	let x_start = (visible_chunks[0].log2_offset - focus) / screen_to_real + canvas.width * 0.5;
 
-	drawGraph("log2_density", x_start, render_bin_size / screen_to_real, 50, -40);
+	let view = views[0];
+	let y = 0;
+	for (const clip of view.clips) {
+		ctx.save();
 
-	drawGraph("log2_min", x_start, render_bin_size / screen_to_real, 150, -30);
-	drawGraph("log2_mean", x_start, render_bin_size / screen_to_real, 150, -30);
-	drawGraph("log2_max", x_start, render_bin_size / screen_to_real, 150, -30);
+		let clipping_region = new Path2D();
+		clipping_region.rect(0, y, canvas.width, clip.height);
+		ctx.clip(clipping_region);
+		
+		for (const data of clip.data) {
+			drawGraph(data.key, x_start, render_bin_size / screen_to_real, y + clip.height - data.y_offset, -data.y_scale);
+		}
+		
+		ctx.restore();
 
-	ctx.fillStyle = "rgba(100, 100, 240, 0.5)";
+		y += clip.height;
+	}
+
+	/* drawGraph("log2_density", x_start, render_bin_size / screen_to_real, 45, -40);
+
+	ctx.save();
+	let clipping_region = new Path2D();
+	clipping_region.rect(0, 50, canvas.width, 120);
+	ctx.clip(clipping_region);
 	
-	let zoom_area_screen_start = (zoom_area_start - focus) / screen_to_real + canvas.width * 0.5;
-	let zoom_area_screen_end = (zoom_area_end - focus) / screen_to_real + canvas.width * 0.5;
-	let zoom_area_screen_left = Math.min(zoom_area_screen_start, zoom_area_screen_end);
-	let zoom_area_screen_right = Math.max(zoom_area_screen_start, zoom_area_screen_end);
-	let zoom_area_screen_width = zoom_area_screen_right - zoom_area_screen_left;
-	ctx.fillRect(zoom_area_screen_left, 0, zoom_area_screen_width, canvas.height);
+	drawGraph("log2_min", x_start, render_bin_size / screen_to_real, 110, -25);
+	drawGraph("log2_mean", x_start, render_bin_size / screen_to_real, 110, -25);
+	drawGraph("log2_max", x_start, render_bin_size / screen_to_real, 110, -25);
+	
+	ctx.restore(); */
+
+	if (zoom_area_start) {
+		ctx.fillStyle = "rgba(100, 100, 240, 0.5)";
+		let zoom_area_screen_start = (zoom_area_start - focus) / screen_to_real + canvas.width * 0.5;
+		let zoom_area_screen_end = view_mouse_x;
+		let zoom_area_screen_left = Math.min(zoom_area_screen_start, zoom_area_screen_end);
+		let zoom_area_screen_right = Math.max(zoom_area_screen_start, zoom_area_screen_end);
+		let zoom_area_screen_width = zoom_area_screen_right - zoom_area_screen_left;
+		ctx.fillRect(zoom_area_screen_left, 0, zoom_area_screen_width, views[0].height);
+	}
+
+	{
+		let y_top = views[0].height;
+		let height = views[1].height;
+		let y_bot = y_top + height;
+
+		ctx.beginPath();
+		let total_size = chromosome_sizes.reduce((a, e) => a + e);
+		let x = 0;
+		let [start, end] = get_start_and_end();
+		start = Math.max(0, start - chr.offset) / chr.size;
+		end = Math.min(chr.size, end - chr.offset) / chr.size;
+		for (let i = 0; i < chromosome_names.length - 1; ++i) {
+			let stride = chromosome_sizes[i] * canvas.width / total_size;
+			if (i == chr.index) {
+				start = x + stride * start;
+				end = x + stride * end;
+			}
+			x += stride;
+			ctx.moveTo(x, y_top);
+			ctx.lineTo(x, y_bot);
+		}
+		ctx.stroke();
+
+		ctx.fillStyle = "rgba(100, 100, 240, 0.5)";
+		ctx.fillRect(start, y_top, end - start, height);
+	}
+
+	{
+		ctx.beginPath();
+		let y = 0;
+		for (const view of views) {
+			if (view.clips) {
+				let clip_y = y;
+				for (const clip of view.clips) {
+					clip_y += clip.height;
+					ctx.moveTo(0, clip_y);
+					ctx.lineTo(canvas.width, clip_y);
+				}
+			}
+			y += view.height;
+			ctx.moveTo(0, y);
+			ctx.lineTo(canvas.width, y);
+		}
+		ctx.stroke();
+	}
 }
 
 function get_chunk(chr, size, index) {
@@ -334,6 +516,8 @@ function fetch_chunk(chr, size, index) {
 		}
 
 		fresh_chunk_fetched = true;
+
+		// console.log(chunk_identifier);
 	});
 }
 
@@ -341,6 +525,16 @@ window.onload = function () {
 	document.getElementById("view_canvas").addEventListener("mousedown", on_mouse_down_canvas);
 	document.getElementById("view_canvas").addEventListener("mouseup", on_mouse_up_canvas);
 	window.addEventListener("mousemove", on_mouse_move);
+
+	const canvas = document.getElementById("view_canvas");
+	if (canvas.width != window.innerWidth)
+		canvas.width = window.innerWidth;
+
+	let chromosome_select = document.getElementById("chromosome_dropdown_select");
+	chromosome_select.onchange = function () {
+		chromosome_index = chromosome_select.selectedIndex;
+	};
+	hash_change_handler();
 
 	window.requestAnimationFrame(on_animation_frame);
 };

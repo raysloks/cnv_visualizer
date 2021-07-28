@@ -60,7 +60,7 @@ int main(int argc, char ** argv)
     //     chr_data.save("vscode/data/");
     // }
 
-    if (argc < 2)
+    if (argc < 3)
         return 1;
 
     GenomeData data;
@@ -71,10 +71,11 @@ int main(int argc, char ** argv)
     loader.load(data, is);
     
     std::string path = argv[1];
-    path = path.substr(0, path.find_last_of('/') + 1);
-    path += "vis/";
+    path = path.substr(0, path.find_last_of('/'));
+	data.name = path.substr(path.find_last_of('/') + 1);
+    path += "/vis/";
 
-    data.save(path);
+    data.save(path, argv[2]);
 
     return 0;
 }

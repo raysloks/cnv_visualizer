@@ -3,6 +3,76 @@ body {
     padding: 0;
 }
 
+h1 {
+	margin: 15px;
+	margin-left: 30px;
+	color: #f3f1c4;
+}
+
+select {
+	display: none;
+	margin: 0px;
+	margin-left: 30px;
+	font-size: 30px;
+}
+
+#top_bar {
+	margin: 0px;
+	padding: 0px;
+	background-color: #264260;
+	display: flex;
+}
+
+.dropdown {
+	display: inline-block;
+	margin: 0px;
+	padding: 0px;
+}
+
+#chromosome_dropdown_current {
+	display: inline-block;
+	line-height: 70px;
+	padding-left: 15px;
+	padding-right: 15px;
+	height: 100%;
+	text-align: right;
+	font-size: 40px;
+	min-width: 60px;
+	background-color: #eb2640;
+	color: #f3f1c4;
+	text-decoration: none;
+}
+
+.dropdown_content {
+	display: none;
+	position: absolute;
+	width: auto;
+	height: 80%;
+	pointer-events: none;
+	flex-direction: column;
+	flex-wrap: wrap;
+}
+
+.dropdown_content a {
+	display: block;
+	pointer-events: auto;
+	background-color: #f4543c;
+	color: #264260;
+	text-decoration: none;
+	font-size: 20px;
+	text-align: right;
+	padding: 10px;
+	min-width: 30px;
+}
+
+.dropdown_content a:hover {
+	background-color: #139baf;
+}
+
+.dropdown:hover .dropdown_content {
+	display: flex;
+}
+
 .canvas_cursor_text {
     cursor: text;
 }

@@ -67,6 +67,7 @@ int DocumentTemplate::parse(std::ostream& os)
 							{
 								++scope.index;
 								//std::cout << scope.index << std::endl;
+								variables[scope.variable + 1].second = std::to_string(scope.index);
 								std::string& iterator_value = variables[scope.variable].second;
 								iterator_value = scope.iterable + "[" + std::to_string(scope.index) + "]";
 								auto it = data.lower_bound(iterator_value);
@@ -86,6 +87,7 @@ int DocumentTemplate::parse(std::ostream& os)
 						scope.iterable = resolve(tokens[3]);
 						scopes.push_back(scope);
 						variables.push_back(std::make_pair(tokens[1], std::string()));
+						variables.push_back(std::make_pair("@" + tokens[1], std::string()));
 						--i;
 						continue;
 					}
