@@ -20,6 +20,11 @@
 				chromosome_offsets.push(%% chr.offset %%);
 				chromosome_sizes.push(%% chr.size %%);
 				%% end
+				let chunk_size = %% chunk_size %%;
+				let chunk_data_lines = [];
+				%% for data_line in data_lines
+				chunk_data_lines.push("%% data_line %%");
+				%% end
 			</script>
 			<select id="chromosome_dropdown_select">
 				%% for chr in chromosomes

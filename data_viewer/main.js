@@ -8,16 +8,19 @@ while (bin_sizes[bin_sizes.length - 1] < max_bin_size) {
 	bin_sizes.push(bin_sizes[bin_sizes.length - 1] * 2);
 }
 
-let chunk_size = 2048;
+// let chunk_size = 2048;
 
 let resolution_modifier = 1.95;
 let initial_view_margin = 1.2;
+let min_zoom_area_width = 5;
 
 let chr = {};
 
 let chromosome_index = 0;
 let screen_to_real = max_bin_size;
 let focus = 0;
+
+let canvas;
 
 let current_bin_size = max_bin_size;
 
@@ -28,6 +31,8 @@ let last_focus;
 let fresh_chunk_fetched = true;
 
 let chunks = {};
+
+let calls;
 
 window.addEventListener('keydown', key_down_handler);
 window.addEventListener('keyup', key_up_handler);
@@ -82,7 +87,19 @@ function on_mouse_down_canvas(e) {
 		return;
 	zoom_area_start = (e.offsetX - e.target.width * 0.5) * screen_to_real + focus;
 	zoom_area_end = zoom_area_start;
-	console.log(zoom_area_start);
+	// console.log(zoom_area_start);
+
+	if (calls) {
+		if (chr.name in calls.chromosomes) {
+			for (const record of calls.chromosomes[chr.name].records) {
+				let screen_pos = (record.pos - focus) / screen_to_real + canvas.width * 0.5;
+				let screen_end = (record.info["END"] - focus) / screen_to_real + canvas.width * 0.5;
+				if (e.offsetX > screen_pos && e.offsetX < screen_end) {
+					// console.log(record);
+				}
+			}
+		}
+	}
 }
 
 function on_mouse_up_canvas(e) {
@@ -91,14 +108,14 @@ function on_mouse_up_canvas(e) {
 
 	zoom_area_end = (e.offsetX - e.target.width * 0.5) * screen_to_real + focus;
 
-	perform_zoom(zoom_area_start, zoom_area_end);
+	if (Math.abs(zoom_area_end - zoom_area_start) / screen_to_real >= min_zoom_area_width)
+		perform_zoom(zoom_area_start, zoom_area_end);
 
 	zoom_area_start = null;
 	zoom_area_end = null;
 }
 
 function on_mouse_move(e) {
-	const canvas = document.getElementById("view_canvas");
 	view_mouse_x = e.clientX - canvas.getBoundingClientRect().left;
 	if (zoom_area_start === null)
 		return;
@@ -111,24 +128,20 @@ function perform_zoom(start, end, smooth) {
 	let zoom_area_width = zoom_area_right - zoom_area_left;
 	let zoom_area_midpoint = (zoom_area_left + zoom_area_right) * 0.5;
 
-	const canvas = document.getElementById("view_canvas");
-
 	smooth = smooth ?? use_smooth_zoom;
 
-	if (zoom_area_width / screen_to_real >= 1) {
-		if (smooth) {
-			smooth_zoom_target_focus = zoom_area_midpoint;
-			smooth_zoom_target_screen_to_real = zoom_area_width / canvas.width;
-			smooth_zoom_remaining_delay = smooth_zoom_delay;
-		} else {
-			focus = zoom_area_midpoint;
-			screen_to_real = zoom_area_width / canvas.width;
-		}
+	// if (zoom_area_width / screen_to_real >= 1)
+	if (smooth) {
+		smooth_zoom_target_focus = zoom_area_midpoint;
+		smooth_zoom_target_screen_to_real = zoom_area_width / canvas.width;
+		smooth_zoom_remaining_delay = smooth_zoom_delay;
+	} else {
+		focus = zoom_area_midpoint;
+		screen_to_real = zoom_area_width / canvas.width;
 	}
 }
 
 function get_start_and_end() {
-	const canvas = document.getElementById("view_canvas");
 	let half = screen_to_real * canvas.width * 0.5;
 	return [focus - half, focus + half];
 }
@@ -150,7 +163,6 @@ function set_state_from_hash(hash) {
 		if (matches[2])
 			perform_zoom(matches[3], matches[4], same_index && undefined);
 		else {
-			const canvas = document.getElementById("view_canvas");
 			let midpoint = chromosome_offsets[chromosome_index] + chromosome_sizes[chromosome_index] * 0.5;
 			let half_size = chromosome_sizes[chromosome_index] * initial_view_margin * 0.5;
 			perform_zoom(midpoint - half_size, midpoint + half_size, same_index && undefined);
@@ -165,8 +177,6 @@ function check_update() {
 		|| last_focus != focus 
 		|| fresh_chunk_fetched 
 		|| last_zoom_area_end != zoom_area_end) {
-
-		const canvas = document.getElementById("view_canvas");
 
 		if (canvas.width != window.innerWidth)
 			canvas.width = window.innerWidth;
@@ -261,7 +271,7 @@ let views = [
 				height: 50,
 				data: [
 					{
-						key: "log2_density",
+						key: "coverage_density",
 						y_offset: 5,
 						y_scale: 40
 					}
@@ -271,19 +281,28 @@ let views = [
 				height: 200,
 				data: [
 					{
-						key: "log2_min",
+						key: "coverage_min",
+						density_key: "coverage_density",
 						y_offset: 120,
 						y_scale: 30
 					},
 					{
-						key: "log2_mean",
+						key: "coverage_mean",
+						density_key: "coverage_density",
 						y_offset: 120,
 						y_scale: 30
 					},
 					{
-						key: "log2_max",
+						key: "coverage_max",
+						density_key: "coverage_density",
 						y_offset: 120,
 						y_scale: 30
+					}
+				],
+				lines: [
+					{
+						y: 120,
+						style: "rgba(50, 50, 200, 0.5)"
 					}
 				]
 			}
@@ -296,7 +315,6 @@ let views = [
 ];
 
 function render(render_bin_size) {
-	const canvas = document.getElementById("view_canvas");
 	const ctx = canvas.getContext("2d");
 
 	if (canvas.width != window.innerWidth)
@@ -347,23 +365,44 @@ function render(render_bin_size) {
 	ctx.setTransform(1, 0, 0, 1, 0, 0);
 	ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-	function drawGraph(key, x, x_scale, y, y_scale, density_key) {
+	function drawGraph(key, x_off, x_scale, y_off, y_scale, density_key) {
 		ctx.beginPath();
-		ctx.moveTo(x, y + visible_chunks[0].data[key][0] * y_scale);
+
+		let strokes = 0;
+		let x;
+		let y;
 
 		for (let j = 0; j < visible_chunks.length; ++j) {
 			let data = visible_chunks[j].data[key];
+			let density_data;
+			if (density_key !== undefined)
+				density_data = visible_chunks[j].data[density_key];
 			for (let i = 0; i < data.length; ++i) {
 				let value = data[i];
-				ctx.lineTo(x + i * x_scale, y + value * y_scale);
+				if (density_data)
+					if (density_data[i] == 0) {
+						if (strokes == 1) {
+							ctx.lineTo(x + 0.5 * x_scale, y);
+							ctx.lineTo(x - 0.5 * x_scale, y);
+						}
+						strokes = 0;
+						continue;
+					}
+				x = x_off + i * x_scale;
+				y = y_off + value * y_scale;
+				if (strokes > 0)
+					ctx.lineTo(x, y);
+				else
+					ctx.moveTo(x, y);
+				++strokes;
 			}
-			x += data.length * x_scale;
+			x_off += data.length * x_scale;
 		}
 
 		ctx.stroke();
 	}
 
-	let x_start = (visible_chunks[0].log2_offset - focus) / screen_to_real + canvas.width * 0.5;
+	let x_start = (visible_chunks[0].offset - focus) / screen_to_real + canvas.width * 0.5;
 
 	let view = views[0];
 	let y = 0;
@@ -373,9 +412,22 @@ function render(render_bin_size) {
 		let clipping_region = new Path2D();
 		clipping_region.rect(0, y, canvas.width, clip.height);
 		ctx.clip(clipping_region);
+
+		if (clip.lines) {
+			for (const line of clip.lines) {
+				ctx.save();
+				if (line.style)
+					ctx.strokeStyle = line.style;
+				ctx.beginPath();
+				ctx.moveTo(0, y + clip.height - line.y);
+				ctx.lineTo(canvas.width, y + clip.height - line.y);
+				ctx.stroke();
+				ctx.restore();
+			}
+		}
 		
 		for (const data of clip.data) {
-			drawGraph(data.key, x_start, render_bin_size / screen_to_real, y + clip.height - data.y_offset, -data.y_scale);
+			drawGraph(data.key, x_start, render_bin_size / screen_to_real, y + clip.height - data.y_offset, -data.y_scale, data.density_key);
 		}
 		
 		ctx.restore();
@@ -383,27 +435,30 @@ function render(render_bin_size) {
 		y += clip.height;
 	}
 
-	/* drawGraph("log2_density", x_start, render_bin_size / screen_to_real, 45, -40);
-
-	ctx.save();
-	let clipping_region = new Path2D();
-	clipping_region.rect(0, 50, canvas.width, 120);
-	ctx.clip(clipping_region);
-	
-	drawGraph("log2_min", x_start, render_bin_size / screen_to_real, 110, -25);
-	drawGraph("log2_mean", x_start, render_bin_size / screen_to_real, 110, -25);
-	drawGraph("log2_max", x_start, render_bin_size / screen_to_real, 110, -25);
-	
-	ctx.restore(); */
-
 	if (zoom_area_start) {
-		ctx.fillStyle = "rgba(100, 100, 240, 0.5)";
 		let zoom_area_screen_start = (zoom_area_start - focus) / screen_to_real + canvas.width * 0.5;
 		let zoom_area_screen_end = view_mouse_x;
 		let zoom_area_screen_left = Math.min(zoom_area_screen_start, zoom_area_screen_end);
 		let zoom_area_screen_right = Math.max(zoom_area_screen_start, zoom_area_screen_end);
 		let zoom_area_screen_width = zoom_area_screen_right - zoom_area_screen_left;
+		ctx.fillStyle = "rgba(100, 100, 240, 0.5)";
+		if (zoom_area_screen_width < min_zoom_area_width)
+			ctx.fillStyle = "rgba(100, 100, 240, 0.25)";
 		ctx.fillRect(zoom_area_screen_left, 0, zoom_area_screen_width, views[0].height);
+	}
+
+	if (calls) {
+		if (chr.name in calls.chromosomes) {
+			for (const record of calls.chromosomes[chr.name].records) {
+				let screen_pos = (record.pos - focus) / screen_to_real + canvas.width * 0.5;
+				let screen_end = (record.info["END"] - focus) / screen_to_real + canvas.width * 0.5;
+				if (record.alt == "<DEL>")
+					ctx.fillStyle = "rgba(200, 10, 10, 0.25)";
+				if (record.alt == "<DUP>")
+					ctx.fillStyle = "rgba(10, 200, 10, 0.25)";
+				ctx.fillRect(screen_pos, 0, screen_end - screen_pos, views[0].height);
+			}
+		}
 	}
 
 	{
@@ -481,7 +536,18 @@ function fetch_chunk(chr, size, index) {
 		let chunk = {};
 		chunks[chunk_identifier] = chunk;
 
-		let view = new DataView(arrayBuffer);
+		chunk.offset = chromosome_offsets[chromosome_names.findIndex(e => e == chr)] + size * index * chunk_size;
+		chunk.data = {};
+
+		let offset = 0;
+		for (const data_line of chunk_data_lines) {
+			chunk.data[data_line] = new Float32Array(arrayBuffer, offset, chunk_size);
+			offset += chunk_size * 4;
+		}
+
+		// console.log(chunk);
+
+		/* let view = new DataView(arrayBuffer);
 		let scale = view.getInt32(0, true);
 		let baf_offset = view.getInt32(4, true);
 		let baf_size = view.getInt32(8, true);
@@ -513,7 +579,7 @@ function fetch_chunk(chr, size, index) {
 			log2_min.push(view.getFloat32(off + 8 + i * 16 + 4, true));
 			log2_mean.push(view.getFloat32(off + 8 + i * 16 + 8, true));
 			log2_max.push(view.getFloat32(off + 8 + i * 16 + 12, true));
-		}
+		} */
 
 		fresh_chunk_fetched = true;
 
@@ -526,7 +592,7 @@ window.onload = function () {
 	document.getElementById("view_canvas").addEventListener("mouseup", on_mouse_up_canvas);
 	window.addEventListener("mousemove", on_mouse_move);
 
-	const canvas = document.getElementById("view_canvas");
+	canvas = document.getElementById("view_canvas");
 	if (canvas.width != window.innerWidth)
 		canvas.width = window.innerWidth;
 
@@ -535,6 +601,10 @@ window.onload = function () {
 		chromosome_index = chromosome_select.selectedIndex;
 	};
 	hash_change_handler();
+
+	fetch("calls.json")
+	.then(response => response.json())
+	.then(data => calls = data);
 
 	window.requestAnimationFrame(on_animation_frame);
 };

@@ -43,6 +43,10 @@ select {
 	text-decoration: none;
 }
 
+#chromosome_dropdown_current:hover {
+	background-color: #139baf;
+}
+
 .dropdown_content {
 	display: none;
 	position: absolute;

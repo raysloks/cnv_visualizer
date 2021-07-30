@@ -30,6 +30,27 @@ ChromosomeData ChromosomeData::shrink() const
     return chr_data;
 }
 
+int chunk_size = 2048;
+
+template <class T>
+std::vector<float> extract(const std::vector<T>& input, size_t offset, float T::*member)
+{
+	std::vector<float> output(chunk_size);
+
+	for (size_t i = offset; i < input.size() && i < offset + chunk_size; ++i)
+	{
+		output[i - offset] = input[i].*member;
+	}
+
+	return output;
+}
+
+template <class T>
+void dump_it(const std::vector<T>& input, std::ostream& os)
+{
+	os.write((char*)input.data(), sizeof(T) * input.size());
+}
+
 int ChromosomeData::save(const std::string& path) const
 {
     std::cout << "exporting chromosome " << chr_template.name << "..." << std::endl;
@@ -43,14 +64,24 @@ int ChromosomeData::save(const std::string& path) const
     {
         if (expected_scale >= 100)
         {
-            int chunk_size = 2048;
             for (int i = 0; i < shrunk_chr_data.baf_data.size() || i < shrunk_chr_data.log2_coverage_data.size(); i += chunk_size)
             {
                 std::string fp = path + chr_template.name + "_" + std::to_string(shrunk_chr_data.scale) + "_" + std::to_string(i / chunk_size) + ".cvd";
                 // std::cout << fp << std::endl;
                 std::ofstream f(fp, std::ofstream::binary | std::ofstream::trunc);
 
-                f.write((char*)&shrunk_chr_data.scale, sizeof(shrunk_chr_data.scale));
+				dump_it(extract(shrunk_chr_data.log2_coverage_data, i, &CoverageData::density), f);
+				dump_it(extract(shrunk_chr_data.log2_coverage_data, i, &CoverageData::mean), f);
+				dump_it(extract(shrunk_chr_data.log2_coverage_data, i, &CoverageData::min), f);
+				dump_it(extract(shrunk_chr_data.log2_coverage_data, i, &CoverageData::max), f);
+
+				dump_it(extract(shrunk_chr_data.baf_data, i, &BafData::total_density), f);
+				dump_it(extract(shrunk_chr_data.baf_data, i, &BafData::top_density), f);
+				dump_it(extract(shrunk_chr_data.baf_data, i, &BafData::mid_density), f);
+				dump_it(extract(shrunk_chr_data.baf_data, i, &BafData::bot_density), f);
+				dump_it(extract(shrunk_chr_data.baf_data, i, &BafData::mid_mean), f);
+
+                /* f.write((char*)&shrunk_chr_data.scale, sizeof(shrunk_chr_data.scale));
 
                 int baf_offset = shrunk_chr_data.baf_offset + i * shrunk_chr_data.scale;
                 f.write((char*)&baf_offset, sizeof(baf_offset));
@@ -62,7 +93,7 @@ int ChromosomeData::save(const std::string& path) const
                 f.write((char*)&log2_offset, sizeof(log2_offset));
                 int log2_size = std::min(chunk_size, std::max(0, (int)shrunk_chr_data.log2_coverage_data.size() - i));
                 f.write((char*)&log2_size, sizeof(log2_size));
-                f.write((char*)(shrunk_chr_data.log2_coverage_data.data() + i), sizeof(CoverageData) * log2_size);
+                f.write((char*)(shrunk_chr_data.log2_coverage_data.data() + i), sizeof(CoverageData) * log2_size); */
             }
         }
 
