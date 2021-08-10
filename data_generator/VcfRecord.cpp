@@ -46,3 +46,60 @@ VcfRecord::VcfRecord(const std::string& line)
 		}
 	}
 }
+
+std::string VcfRecord::getString() const
+{
+	std::string str = chrom + "\t";
+	str += std::to_string(pos) + "\t";
+	str += id + "\t";
+	str += ref + "\t";
+	str += alt + "\t";
+	if (qual < 9000.0f)
+		str += ".\t";
+	else
+		str += std::to_string(qual) + "\t";
+	bool not_first = false;
+	if (info.empty())
+		str += ".";
+	for (auto& kv : info)
+	{
+		if (not_first)
+			str += ";";
+		str += kv.first + "=" + kv.second;
+		not_first = true;
+	}
+	if (format.size() > 0)
+		str += "\t" + format;
+	for (auto& sample : samples)
+		str += "\t" + sample;
+	return str;
+}
+
+std::vector<float> VcfRecord::getFloatInfoVector(const std::string& key) const
+{
+	std::vector<float> result;
+	auto it = info.find(key);
+	if (it == info.end())
+		return result;
+	std::string s = it->second;
+	if (s == ".")
+		return result;
+	while (s.size() > 0)
+	{
+		size_t index = s.find(',');
+		std::string sub = s.substr(0, index);
+		float value = -9999.0f;
+		try
+		{
+			value = std::stof(sub);
+		}
+		catch ( ... )
+		{
+		}
+		result.push_back(value);
+		if (index == std::string::npos)
+			break;
+		s = s.substr(index + 1);
+	}
+	return result;
+}

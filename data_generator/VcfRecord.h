@@ -9,6 +9,10 @@ class VcfRecord
 public:
 	VcfRecord(const std::string& line);
 
+	std::string getString() const;
+
+	std::vector<float> getFloatInfoVector(const std::string& key) const;
+
 	std::vector<std::string> fields;
 	std::string chrom;
 	int pos;

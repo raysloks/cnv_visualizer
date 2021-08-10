@@ -12,6 +12,8 @@ class GenomeData
 public:
     void save(const std::string& path, const std::string& template_path) const;
 
+	int addBafData(const VcfData& baf);
+
 	Coal getCallData() const;
 
     ChromosomeData& getChromosomeByName(const std::string& name);

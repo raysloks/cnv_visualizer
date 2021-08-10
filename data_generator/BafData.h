@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 class BafData
 {
 public:
@@ -13,4 +15,6 @@ public:
     float mid_mean;
 
     BafData combine(const BafData& rhs) const;
+	
+	BafData& operator+=(const BafData& rhs);
 };

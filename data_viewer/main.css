@@ -9,6 +9,11 @@ h1 {
 	color: #f3f1c4;
 }
 
+canvas {
+	border-bottom: 2px solid black;
+	float: left;
+}
+
 select {
 	display: none;
 	margin: 0px;

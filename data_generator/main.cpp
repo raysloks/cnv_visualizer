@@ -8,6 +8,7 @@
 #include "GenomeData.h"
 #include "CoverageDataLoader.h"
 #include "VcfLoader.h"
+#include "CmdOption.h"
 
 #include "Coal.h"
 
@@ -68,42 +69,129 @@ int main(int argc, char ** argv)
     //     chr_data.save("vscode/data/");
     // }
 
+	std::string filter_vcf_output;
+	std::string filter_vcf_key;
+	float filter_vcf_cutoff;
+
+	std::string baf_calls;
+	std::string baf_filter;
+
+	std::vector<CmdOption> options = {
+		CmdOption('f', "filter-vcf", "filter a gVCF file.", "long desc here yada yada", "help and example here", std::vector<CmdValue>({ CmdValue(&filter_vcf_output, true), CmdValue(&filter_vcf_key, false), CmdValue(&filter_vcf_cutoff) })),
+		CmdOption('b', "baf", "use base allele frequency as well.", "long desc", "help and example", std::vector<CmdValue>({ CmdValue(&baf_calls, true), CmdValue(&baf_filter, true) }))
+	};
+
 	std::string tsv_path, html_path;
 	std::vector<std::string> vcf_paths;
 
 	for (size_t i = 0; i < argc; ++i)
 	{
 		std::string arg = argv[i];
-		std::string extension = arg.substr(arg.find_last_of('.'));
-		for (auto& c : extension)
-			c = std::tolower(c);
-		if (extension == ".tsv")
-			tsv_path = arg;
-		if (extension == ".vcf")
-			vcf_paths.push_back(arg);
-		if (extension == ".html")
-			html_path = arg;
+
+		if (arg[0] == '-' && arg.size() >= 2)
+		{
+			std::vector<CmdOption*> matches;
+			if (arg[1] == '-')
+			{
+				for (auto& option : options)
+					if (option.flag_long == arg.substr(2))
+					{
+						matches.push_back(&option);
+						break;
+					}
+				if (matches.empty())
+					std::cerr << "ERROR: unrecognized option '" << arg << "'." << std::endl;
+			}
+			else
+			{
+				for (size_t i = 1; i < arg.size(); ++i)
+				{
+					bool found = false;
+					for (auto& option : options)
+						if (option.flag_short == arg[i])
+						{
+							matches.push_back(&option);
+							found = true;
+							break;
+						}
+					if (!found)
+						std::cerr << "ERROR: unrecognized option '-" << arg[i] << "'." << std::endl;
+				}
+			}
+			for (auto& match : matches)
+			{
+				for (auto& value : match->values)
+				{
+					if (value.needsValue())
+					{
+						++i;
+						if (i >= argc)
+						{
+							std::cerr << "ERROR: missing argument '' for option ''." << std::endl;
+							break;
+						}
+						value.parseValue(argv[i]);
+					}
+					else
+						value.parseValue(std::string());
+				}
+			}
+		}
+
+		size_t index = arg.find_last_of('.');
+		if (index != std::string::npos)
+		{
+			std::string extension = arg.substr(index);
+			for (auto& c : extension)
+				c = std::tolower(c);
+			if (extension == ".tsv")
+				tsv_path = arg;
+			if (extension == ".vcf")
+				vcf_paths.push_back(arg);
+			if (extension == ".html")
+				html_path = arg;
+		}
 	}
 
-    GenomeData data;
-
-    CoverageDataLoader cov_loader(100);
-    std::ifstream tsv_is(tsv_path);
-    cov_loader.load(data, tsv_is);
-
-	for (auto& path : vcf_paths)
+	if (filter_vcf_output.size())
 	{
-		std::ifstream vcf_is(path);
+		std::ofstream vcf_os(filter_vcf_output, std::ofstream::binary | std::ofstream::trunc);
 		VcfLoader vcf_loader;
-		vcf_loader.load(data.vcf, vcf_is);
+		vcf_loader.baf_key = filter_vcf_key;
+		vcf_loader.baf_cutoff = filter_vcf_cutoff;
+		vcf_loader.filterBaf(std::cin, vcf_os);
 	}
 
-    std::string path = tsv_path;
-    path = path.substr(0, path.find_last_of('/'));
-	data.name = path.substr(path.find_last_of('/') + 1);
-    path += "/vis/";
+	if (tsv_path.size())
+	{
+		GenomeData data;
 
-    data.save(path, html_path);
+		CoverageDataLoader cov_loader(100);
+		std::ifstream tsv_is(tsv_path);
+		cov_loader.load(data, tsv_is);
+
+		VcfLoader vcf_loader;
+
+		for (auto& path : vcf_paths)
+		{
+			std::ifstream vcf_is(path);
+			vcf_loader.load(data.vcf, vcf_is);
+		}
+
+		if (baf_calls.size())
+		{
+			std::ifstream baf_calls_is(baf_calls);
+			std::ifstream baf_filter_is(baf_filter);
+			vcf_loader.filterBafData(data, baf_filter_is, baf_calls_is);
+		}
+
+		std::string path = tsv_path;
+		path = path.substr(0, path.find_last_of('/'));
+		data.name = path.substr(path.find_last_of('/') + 1);
+		path += "/vis/";
+
+		data.save(path, html_path);
+	}
 
     return 0;
 }

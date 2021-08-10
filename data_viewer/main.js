@@ -20,8 +20,6 @@ let chromosome_index = 0;
 let screen_to_real = max_bin_size;
 let focus = 0;
 
-let canvas;
-
 let current_bin_size = max_bin_size;
 
 let last_chromosome_index;
@@ -92,8 +90,8 @@ function on_mouse_down_canvas(e) {
 	if (calls) {
 		if (chr.name in calls.chromosomes) {
 			for (const record of calls.chromosomes[chr.name].records) {
-				let screen_pos = (record.pos - focus) / screen_to_real + canvas.width * 0.5;
-				let screen_end = (record.info["END"] - focus) / screen_to_real + canvas.width * 0.5;
+				let screen_pos = (record.pos - focus) / screen_to_real + window.innerWidth * 0.5;
+				let screen_end = (record.info["END"] - focus) / screen_to_real + window.innerWidth * 0.5;
 				if (e.offsetX > screen_pos && e.offsetX < screen_end) {
 					// console.log(record);
 				}
@@ -116,10 +114,10 @@ function on_mouse_up_canvas(e) {
 }
 
 function on_mouse_move(e) {
-	view_mouse_x = e.clientX - canvas.getBoundingClientRect().left;
+	view_mouse_x = e.clientX;
 	if (zoom_area_start === null)
 		return;
-	zoom_area_end = (e.clientX - canvas.getBoundingClientRect().left - canvas.width * 0.5) * screen_to_real + focus;
+	zoom_area_end = (e.clientX - window.innerWidth * 0.5) * screen_to_real + focus;
 }
 
 function perform_zoom(start, end, smooth) {
@@ -133,16 +131,16 @@ function perform_zoom(start, end, smooth) {
 	// if (zoom_area_width / screen_to_real >= 1)
 	if (smooth) {
 		smooth_zoom_target_focus = zoom_area_midpoint;
-		smooth_zoom_target_screen_to_real = zoom_area_width / canvas.width;
+		smooth_zoom_target_screen_to_real = zoom_area_width / window.innerWidth;
 		smooth_zoom_remaining_delay = smooth_zoom_delay;
 	} else {
 		focus = zoom_area_midpoint;
-		screen_to_real = zoom_area_width / canvas.width;
+		screen_to_real = zoom_area_width / window.innerWidth;
 	}
 }
 
 function get_start_and_end() {
-	let half = screen_to_real * canvas.width * 0.5;
+	let half = screen_to_real * window.innerWidth * 0.5;
 	return [focus - half, focus + half];
 }
 
@@ -177,9 +175,6 @@ function check_update() {
 		|| last_focus != focus 
 		|| fresh_chunk_fetched 
 		|| last_zoom_area_end != zoom_area_end) {
-
-		if (canvas.width != window.innerWidth)
-			canvas.width = window.innerWidth;
 
 		if (last_chromosome_index != chromosome_index) {
 			document.getElementById("chromosome_dropdown_select").selectedIndex = chromosome_index;
@@ -265,10 +260,11 @@ function on_animation_frame(timestamp) {
 let views = [
 	{
 		type: "chromosome",
-		height: 250,
+		height: 450,
 		clips: [
 			{
 				height: 50,
+				label: "Coverage Density",
 				data: [
 					{
 						key: "coverage_density",
@@ -279,6 +275,7 @@ let views = [
 			},
 			{
 				height: 200,
+				label: "Coverage (Log2)",
 				data: [
 					{
 						key: "coverage_min",
@@ -305,20 +302,68 @@ let views = [
 						style: "rgba(50, 50, 200, 0.5)"
 					}
 				]
+			},
+			{
+				height: 50,
+				label: "BAF Mean",
+				data: [
+					{
+						key: "baf_mid_mean",
+						density_key: "baf_mid_density",
+						y_offset: 0,
+						y_scale: 50
+					}
+				]
+			},
+			{
+				height: 50,
+				label: "BAF Top Density",
+				data: [
+					{
+						key: "baf_top_density",
+						y_offset: 0,
+						y_scale: 50
+					}
+				]
+			},
+			{
+				height: 50,
+				label: "BAF Main Density",
+				data: [
+					{
+						key: "baf_mid_density",
+						y_offset: 0,
+						y_scale: 50
+					}
+				]
+			},
+			{
+				height: 50,
+				label: "BAF Bottom Density",
+				data: [
+					{
+						key: "baf_bot_density",
+						y_offset: 0,
+						y_scale: 50
+					}
+				]
 			}
 		]
 	},
 	{
 		type: "overview",
-		height: 80
+		height: 80,
+		clips: [
+			{
+				height: 80
+			}
+		]
 	}
 ];
 
-function render(render_bin_size) {
-	const ctx = canvas.getContext("2d");
+let last_visible_chunks;
 
-	if (canvas.width != window.innerWidth)
-		canvas.width = window.innerWidth;
+function render(render_bin_size) {
 
 	if (render_bin_size === undefined) {
 		
@@ -337,9 +382,9 @@ function render(render_bin_size) {
 	let max_chunk_index = Math.floor(chr.size / (chunk_size * render_bin_size));
 
 	let visible_chunks = [];
-	let first_index = Math.floor((focus - canvas.width * 0.5 * screen_to_real - chr.offset) / (chunk_size * render_bin_size));
+	let first_index = Math.floor((focus - window.innerWidth * 0.5 * screen_to_real - chr.offset) / (chunk_size * render_bin_size));
 	first_index = Math.max(0, first_index);
-	let last_index = Math.floor((focus + canvas.width * 0.5 * screen_to_real - chr.offset) / (chunk_size * render_bin_size));
+	let last_index = Math.floor((focus + window.innerWidth * 0.5 * screen_to_real - chr.offset) / (chunk_size * render_bin_size));
 	last_index = Math.min(max_chunk_index, last_index);
 	for (let i = first_index; i <= last_index; ++i) {
 		visible_chunks.push(get_chunk(chr.name, render_bin_size, i));
@@ -362,11 +407,12 @@ function render(render_bin_size) {
 		}
 	}
 
-	ctx.setTransform(1, 0, 0, 1, 0, 0);
-	ctx.clearRect(0, 0, canvas.width, canvas.height);
+	last_visible_chunks = last_visible_chunks ?? visible_chunks;
+	let visible_chunks_changed = !visible_chunks.every((e, i) => e === last_visible_chunks[i]);
+	last_visible_chunks = visible_chunks;
 
-	function drawGraph(key, x_off, x_scale, y_off, y_scale, density_key) {
-		ctx.beginPath();
+	function drawGraph(path, key, x_off, x_scale, y_off, y_scale, density_key) {
+		// ctx.beginPath();
 
 		let strokes = 0;
 		let x;
@@ -382,8 +428,8 @@ function render(render_bin_size) {
 				if (density_data)
 					if (density_data[i] == 0) {
 						if (strokes == 1) {
-							ctx.lineTo(x + 0.5 * x_scale, y);
-							ctx.lineTo(x - 0.5 * x_scale, y);
+							path.lineTo(x + 0.5 * x_scale, y);
+							path.lineTo(x - 0.5 * x_scale, y);
 						}
 						strokes = 0;
 						continue;
@@ -391,27 +437,59 @@ function render(render_bin_size) {
 				x = x_off + i * x_scale;
 				y = y_off + value * y_scale;
 				if (strokes > 0)
-					ctx.lineTo(x, y);
+					path.lineTo(x, y);
 				else
-					ctx.moveTo(x, y);
+					path.moveTo(x, y);
 				++strokes;
 			}
 			x_off += data.length * x_scale;
 		}
 
-		ctx.stroke();
+		// ctx.stroke();
 	}
 
-	let x_start = (visible_chunks[0].offset - focus) / screen_to_real + canvas.width * 0.5;
+	let x_start = (visible_chunks[0].offset - focus) / screen_to_real + window.innerWidth * 0.5;
 
 	let view = views[0];
-	let y = 0;
 	for (const clip of view.clips) {
-		ctx.save();
 
-		let clipping_region = new Path2D();
-		clipping_region.rect(0, y, canvas.width, clip.height);
-		ctx.clip(clipping_region);
+		let canvas = clip.canvas;
+
+		if (canvas.width != window.innerWidth)
+			canvas.width = window.innerWidth;
+		if (canvas.height != clip.height)
+			canvas.height = clip.height;
+
+		let ctx = canvas.getContext("2d");
+
+		ctx.setTransform(1, 0, 0, 1, 0, 0);
+		ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+		if (calls) {
+			if (chr.name in calls.chromosomes) {
+				for (const record of calls.chromosomes[chr.name].records) {
+					let screen_pos = (record.pos - focus) / screen_to_real + canvas.width * 0.5;
+					let screen_end = (record.info["END"] - focus) / screen_to_real + canvas.width * 0.5;
+					if (record.alt == "<DEL>")
+						ctx.fillStyle = "rgba(200, 10, 10, 0.25)";
+					if (record.alt == "<DUP>")
+						ctx.fillStyle = "rgba(10, 200, 10, 0.25)";
+					ctx.fillRect(screen_pos, 0, screen_end - screen_pos, canvas.height);
+				}
+			}
+		}
+
+		if (zoom_area_start) {
+			let zoom_area_screen_start = (zoom_area_start - focus) / screen_to_real + canvas.width * 0.5;
+			let zoom_area_screen_end = view_mouse_x;
+			let zoom_area_screen_left = Math.min(zoom_area_screen_start, zoom_area_screen_end);
+			let zoom_area_screen_right = Math.max(zoom_area_screen_start, zoom_area_screen_end);
+			let zoom_area_screen_width = zoom_area_screen_right - zoom_area_screen_left;
+			ctx.fillStyle = "rgba(100, 100, 240, 0.5)";
+			if (zoom_area_screen_width < min_zoom_area_width)
+				ctx.fillStyle = "rgba(100, 100, 240, 0.25)";
+			ctx.fillRect(zoom_area_screen_left, 0, zoom_area_screen_width, canvas.height);
+		}
 
 		if (clip.lines) {
 			for (const line of clip.lines) {
@@ -419,51 +497,37 @@ function render(render_bin_size) {
 				if (line.style)
 					ctx.strokeStyle = line.style;
 				ctx.beginPath();
-				ctx.moveTo(0, y + clip.height - line.y);
-				ctx.lineTo(canvas.width, y + clip.height - line.y);
+				ctx.moveTo(0, clip.height - line.y);
+				ctx.lineTo(canvas.width, clip.height - line.y);
 				ctx.stroke();
 				ctx.restore();
 			}
 		}
 		
-		for (const data of clip.data) {
-			drawGraph(data.key, x_start, render_bin_size / screen_to_real, y + clip.height - data.y_offset, -data.y_scale, data.density_key);
+		clip.path = new Path2D();
+
+		for (let data of clip.data) {
+			drawGraph(clip.path, data.key, x_start, render_bin_size / screen_to_real, clip.height - data.y_offset, -data.y_scale, data.density_key);
 		}
-		
-		ctx.restore();
 
-		y += clip.height;
-	}
-
-	if (zoom_area_start) {
-		let zoom_area_screen_start = (zoom_area_start - focus) / screen_to_real + canvas.width * 0.5;
-		let zoom_area_screen_end = view_mouse_x;
-		let zoom_area_screen_left = Math.min(zoom_area_screen_start, zoom_area_screen_end);
-		let zoom_area_screen_right = Math.max(zoom_area_screen_start, zoom_area_screen_end);
-		let zoom_area_screen_width = zoom_area_screen_right - zoom_area_screen_left;
-		ctx.fillStyle = "rgba(100, 100, 240, 0.5)";
-		if (zoom_area_screen_width < min_zoom_area_width)
-			ctx.fillStyle = "rgba(100, 100, 240, 0.25)";
-		ctx.fillRect(zoom_area_screen_left, 0, zoom_area_screen_width, views[0].height);
-	}
-
-	if (calls) {
-		if (chr.name in calls.chromosomes) {
-			for (const record of calls.chromosomes[chr.name].records) {
-				let screen_pos = (record.pos - focus) / screen_to_real + canvas.width * 0.5;
-				let screen_end = (record.info["END"] - focus) / screen_to_real + canvas.width * 0.5;
-				if (record.alt == "<DEL>")
-					ctx.fillStyle = "rgba(200, 10, 10, 0.25)";
-				if (record.alt == "<DUP>")
-					ctx.fillStyle = "rgba(10, 200, 10, 0.25)";
-				ctx.fillRect(screen_pos, 0, screen_end - screen_pos, views[0].height);
-			}
-		}
+		ctx.stroke(clip.path);
 	}
 
 	{
-		let y_top = views[0].height;
-		let height = views[1].height;
+		let clip = views[1].clips[0];
+		let canvas = clip.canvas;
+		let ctx = canvas.getContext("2d");
+
+		ctx.setTransform(1, 0, 0, 1, 0, 0);
+		ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+		if (canvas.width != window.innerWidth)
+			canvas.width = window.innerWidth;
+		if (canvas.height != clip.height)
+			canvas.height = clip.height;
+
+		let y_top = 0;
+		let height = clip.height;
 		let y_bot = y_top + height;
 
 		ctx.beginPath();
@@ -473,7 +537,7 @@ function render(render_bin_size) {
 		start = Math.max(0, start - chr.offset) / chr.size;
 		end = Math.min(chr.size, end - chr.offset) / chr.size;
 		for (let i = 0; i < chromosome_names.length - 1; ++i) {
-			let stride = chromosome_sizes[i] * canvas.width / total_size;
+			let stride = chromosome_sizes[i] * window.innerWidth / total_size;
 			if (i == chr.index) {
 				start = x + stride * start;
 				end = x + stride * end;
@@ -488,7 +552,7 @@ function render(render_bin_size) {
 		ctx.fillRect(start, y_top, end - start, height);
 	}
 
-	{
+	/*{
 		ctx.beginPath();
 		let y = 0;
 		for (const view of views) {
@@ -505,12 +569,12 @@ function render(render_bin_size) {
 			ctx.lineTo(canvas.width, y);
 		}
 		ctx.stroke();
-	}
+	}*/
 }
 
 function get_chunk(chr, size, index) {
 	let chunk_identifier = chr + "_" + size + "_" + index;
-	// console.log(chunk_identifier);
+	//console.log(chunk_identifier);
 	if (chunk_identifier in chunks)
 		return chunks[chunk_identifier];
 	else {
@@ -588,13 +652,19 @@ function fetch_chunk(chr, size, index) {
 }
 
 window.onload = function () {
-	document.getElementById("view_canvas").addEventListener("mousedown", on_mouse_down_canvas);
-	document.getElementById("view_canvas").addEventListener("mouseup", on_mouse_up_canvas);
+	window.addEventListener("mousedown", on_mouse_down_canvas);
+	window.addEventListener("mouseup", on_mouse_up_canvas);
 	window.addEventListener("mousemove", on_mouse_move);
 
-	canvas = document.getElementById("view_canvas");
-	if (canvas.width != window.innerWidth)
-		canvas.width = window.innerWidth;
+	let views_element = document.getElementById("views");
+	for (let view of views) {
+		for (let clip of view.clips ?? []) {
+			clip.canvas = document.createElement("canvas");
+			clip.canvas.className = "canvas_cursor_text";
+			views_element.appendChild(clip.canvas);
+			console.log(clip.height);
+		}
+	}
 
 	let chromosome_select = document.getElementById("chromosome_dropdown_select");
 	chromosome_select.onchange = function () {

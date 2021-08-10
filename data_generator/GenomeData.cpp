@@ -14,7 +14,7 @@ void GenomeData::save(const std::string& path, const std::string& template_path)
 	{
 		std::string chr_var = "chromosomes[" + std::to_string(i) + "].";
 		doc.data[chr_var + "name"] = chromosomes[i].chr_template.name;
-		doc.data[chr_var + "offset"] = std::to_string(chromosomes[i].log2_coverage_offset);
+		doc.data[chr_var + "offset"] = std::to_string(chromosomes[i].offset);
 		doc.data[chr_var + "size"] = std::to_string(chromosomes[i].log2_coverage_data.size() * chromosomes[i].scale);
 	}
 
@@ -47,6 +47,34 @@ void GenomeData::save(const std::string& path, const std::string& template_path)
 
     for (auto& chr : chromosomes)
         chr.save(path);
+}
+
+int GenomeData::addBafData(const VcfData& baf)
+{
+	if (chromosomes.empty())
+		return 1;
+	for (auto& chr : chromosomes)
+	{
+		chr.baf_data.resize(chr.log2_coverage_data.size());
+	}
+	ChromosomeData * chr = &chromosomes[0];
+	int out_of_bounds_count = 0;
+	for (auto& record : baf.records)
+	{
+		if (record.chrom != chr->chr_template.name)
+			chr = &getChromosomeByName(record.chrom);
+		int pos = (record.pos - chr->offset) / chr->scale;
+		if (pos < 0 || pos >= chr->baf_data.size())
+		{
+			++out_of_bounds_count;
+			continue;
+		}
+		chr->baf_data[pos] += std::stof(record.info.at("BAF"));
+	}
+	if (out_of_bounds_count > 0)
+		std::cout << "WARNING: " << out_of_bounds_count << " base allele frequency data points were out of bounds. TODO FIX" << std::endl;
+
+	return 0;
 }
 
 Coal GenomeData::getCallData() const

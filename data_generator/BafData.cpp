@@ -1,6 +1,7 @@
 #include "BafData.h"
 
-const float epsilon = 0.001f;
+const float epsilon_top = 0.05f;
+const float epsilon_bot = 0.1f;
 
 BafData::BafData()
 {
@@ -18,11 +19,11 @@ BafData::BafData(float baf)
     mid_density = 0.0f;
     bot_density = 0.0f;
     mid_mean = 0.0f;
-    if (baf > 1.0f - epsilon)
+    if (baf > 1.0f - epsilon_top)
     {
         top_density = 1.0f;
     }
-    else if (baf < epsilon)
+    else if (baf < epsilon_bot)
     {
         bot_density = 1.0f;
     }
@@ -47,4 +48,18 @@ BafData BafData::combine(const BafData& rhs) const
         result.mid_mean = 0.0f;
 
     return result;
+}
+
+BafData& BafData::operator+=(const BafData& rhs)
+{
+	mid_mean = mid_mean * mid_density + rhs.mid_mean * rhs.mid_density;
+	mid_density += rhs.mid_density;
+	if (mid_density > 0.0f)
+		mid_mean /= mid_density;
+
+	total_density += rhs.total_density;
+	top_density += top_density;
+	bot_density += bot_density;
+	
+	return *this;
 }

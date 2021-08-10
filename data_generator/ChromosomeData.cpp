@@ -11,8 +11,7 @@ ChromosomeData ChromosomeData::shrink() const
 
     chr_data.scale = scale * 2;
 
-    chr_data.baf_offset = baf_offset;
-    chr_data.log2_coverage_offset = log2_coverage_offset;
+    chr_data.offset = offset;
 
     chr_data.baf_data.resize(baf_data.size() / 2);
     chr_data.log2_coverage_data.resize(log2_coverage_data.size() / 2);

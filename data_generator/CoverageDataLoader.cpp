@@ -57,7 +57,7 @@ int CoverageDataLoader::load(GenomeData& data, std::istream& is)
         std::cout << chr.first << std::endl;
         auto& chr_data = data.getChromosomeByName(chr.first);
         chr_data.scale = scale;
-        chr_data.log2_coverage_offset = chr.second.begin()->first;
+        chr_data.offset = chr.second.begin()->first;
         int size = (chr.second.rbegin()->first - chr.second.begin()->first) / scale + 1;
         std::cout << size << std::endl;
         if (size <= 0)
