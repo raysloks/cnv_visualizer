@@ -43,8 +43,20 @@ int VcfLoader::filterBaf(std::istream& is, std::ostream& os)
 	std::cout << "key: " << baf_key << std::endl;
 	std::cout << "cutoff: " << baf_cutoff << std::endl;
 
+	size_t base_to_index[256] = {};
+	base_to_index['A'] = 0;
+	base_to_index['C'] = 1;
+	base_to_index['G'] = 2;
+	base_to_index['T'] = 3;
+
+	char index_to_base[4] = {'A', 'C', 'G', 'T'};
+
 	int64_t chr_index = -1;
 	std::string last_chr_name;
+
+	int32_t last_pos = 0;
+	char last_ref = 0;
+	float last_freqs[4] = {};
 
 	int64_t allele_count = 0;
 	int64_t progress_notify = 0;
@@ -88,6 +100,33 @@ int VcfLoader::filterBaf(std::istream& is, std::ostream& os)
 
 			VcfRecord record(line);
 
+			if (last_pos != record.pos || last_chr_name != record.chrom)
+			{
+				if (last_ref != 0)
+				{
+					float pos_ref_freq = 1.0f;
+					for (size_t i = 0; i < 4; ++i)
+						pos_ref_freq -= last_freqs[i];
+					last_freqs[base_to_index[last_ref]] = pos_ref_freq;
+					for (size_t i = 0; i < 4; ++i)
+					{
+						if (last_freqs[i] > baf_cutoff)
+						{
+							// this block is read as an int64
+							os.put(index_to_base[i]);
+							os.write((char*)&last_pos, sizeof(last_pos));
+							os.write((char*)&chr_index, 3);
+							// --
+							os.write((char*)&last_freqs[i], sizeof(last_freqs[i]));
+						}
+					}
+				}
+				last_pos = record.pos;
+				last_ref = 0;
+				for (size_t i = 0; i < 4; ++i)
+					last_freqs[i] = 0.0f;
+			}
+
 			if (last_chr_name != record.chrom)
 			{
 				++chr_index;
@@ -106,20 +145,14 @@ int VcfLoader::filterBaf(std::istream& is, std::ostream& os)
 				if (it->second == ".")
 					continue;
 				float freq = std::stof(it->second);
-				if (freq > baf_cutoff)
-				{
-					++allele_count;
-					// this block is read as an int64
-					os.put(alt);
-					os.write((char*)&record.pos, sizeof(record.pos));
-					os.write((char*)&chr_index, 3);
-					// --
-					os.write((char*)&freq, sizeof(freq));
-				}
 				if (freq >= 0.0f)
 				{
 					average_freq_accumulator += freq;
 					++average_freq_accumulator_divisor;
+
+					last_ref = record.ref[0];
+					last_freqs[base_to_index[alt]] = freq;
+					++allele_count;
 				}
 			}
 			else
@@ -151,17 +184,13 @@ int VcfLoader::filterBafData(GenomeData& data, std::istream& is_filter, std::ist
 	int64_t filter_last_key = 0;
 	float filter_last_freq = 0.0f;
 
-	int64_t filter_last_chr_pos = 0;
-	float filter_freq_accumulator = 0.0f;
-	bool filter_use_ref = false;
-
 	int64_t calls_chr_index = -1;
 	std::string calls_last_chr_name;
 
 	int64_t progress_notify = 0;
 	int64_t out_of_bounds_count = 0;
 	int64_t match_count = 0;
-	int64_t ref_count = 0;
+	int64_t miss_count = 0;
 	
 	std::string line;
 	while (std::getline(is_calls, line))
@@ -206,29 +235,6 @@ int VcfLoader::filterBafData(GenomeData& data, std::istream& is_filter, std::ist
 				}
 				is_filter.read((char*)&filter_last_key, sizeof(filter_last_key));
 				is_filter.read((char*)&filter_last_freq, sizeof(filter_last_freq));
-				
-				// add a data point for the reference allele
-				int64_t filter_chr_pos = filter_last_key >> 8;
-				if (filter_chr_pos != filter_last_chr_pos)
-				{
-					if (filter_use_ref)
-					{
-						int32_t filter_chr_index = filter_last_key >> 40;
-						int32_t filter_pos = filter_chr_pos & 0xffffffff;
-						ChromosomeData * filter_chr_data = &data.chromosomes[filter_chr_index];
-						int pos = (filter_pos - filter_chr_data->offset) / filter_chr_data->scale;
-						if (pos < 0 || pos >= filter_chr_data->baf_data.size())
-							++out_of_bounds_count;
-						else
-							filter_chr_data->baf_data[pos] += 1.0f - filter_freq_accumulator;
-						++ref_count;
-					}
-					filter_last_chr_pos = filter_chr_pos;
-					filter_freq_accumulator = 0.0f;
-					filter_use_ref = true;
-				}
-
-				filter_freq_accumulator += filter_last_freq;
 			}
 
 			if (++progress_notify > 1000)
@@ -242,7 +248,7 @@ int VcfLoader::filterBafData(GenomeData& data, std::istream& is_filter, std::ist
 				std::cout << filter_alt << " " << alt << std::endl;
 				std::cout << record.ref << std::endl;
 				std::cout << match_count << std::endl;
-				std::cout << ref_count << std::endl;
+				std::cout << miss_count << std::endl;
 			}
 
 			if (filter_last_key == calls_key)
@@ -253,12 +259,20 @@ int VcfLoader::filterBafData(GenomeData& data, std::istream& is_filter, std::ist
 				else
 					chr_data->baf_data[pos] += filter_last_freq;
 				++match_count;
-				filter_use_ref = false;
 			}
 			else if (filter_last_key == std::numeric_limits<int64_t>::max())
 			{
 				std::cout << "end of filter reached." << std::endl;
 				break;
+			}
+			else
+			{
+				int pos = (record.pos - chr_data->offset) / chr_data->scale;
+				if (pos < 0 || pos >= chr_data->baf_data.size())
+					++out_of_bounds_count;
+				else
+					chr_data->baf_data[pos] += 0.0f;
+				++miss_count;
 			}
 		}
 	}

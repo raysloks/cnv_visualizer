@@ -355,7 +355,8 @@ let views = [
 		height: 80,
 		clips: [
 			{
-				height: 80
+				height: 80,
+				label: "Overview"
 			}
 		]
 	}
@@ -457,8 +458,6 @@ function render(render_bin_size) {
 
 		if (canvas.width != window.innerWidth)
 			canvas.width = window.innerWidth;
-		if (canvas.height != clip.height)
-			canvas.height = clip.height;
 
 		let ctx = canvas.getContext("2d");
 
@@ -518,13 +517,11 @@ function render(render_bin_size) {
 		let canvas = clip.canvas;
 		let ctx = canvas.getContext("2d");
 
-		ctx.setTransform(1, 0, 0, 1, 0, 0);
-		ctx.clearRect(0, 0, canvas.width, canvas.height);
-
 		if (canvas.width != window.innerWidth)
 			canvas.width = window.innerWidth;
-		if (canvas.height != clip.height)
-			canvas.height = clip.height;
+
+		ctx.setTransform(1, 0, 0, 1, 0, 0);
+		ctx.clearRect(0, 0, canvas.width, canvas.height);
 
 		let y_top = 0;
 		let height = clip.height;
@@ -659,10 +656,19 @@ window.onload = function () {
 	let views_element = document.getElementById("views");
 	for (let view of views) {
 		for (let clip of view.clips ?? []) {
+			clip.wrapper = document.createElement("div");
+			clip.wrapper.className = "canvas_wrapper";
+			views_element.appendChild(clip.wrapper);
+
 			clip.canvas = document.createElement("canvas");
+			clip.canvas.height = clip.height;
 			clip.canvas.className = "canvas_cursor_text";
-			views_element.appendChild(clip.canvas);
-			console.log(clip.height);
+			clip.wrapper.appendChild(clip.canvas);
+			
+			let label = document.createElement("a");
+			label.innerHTML = clip.label;
+			label.className = "label";
+			clip.wrapper.appendChild(label);
 		}
 	}
 
@@ -674,7 +680,10 @@ window.onload = function () {
 
 	fetch("calls.json")
 	.then(response => response.json())
-	.then(data => calls = data);
+	.then(data => {
+		calls = data;
+		fresh_chunk_fetched = true;
+	});
 
 	window.requestAnimationFrame(on_animation_frame);
 };

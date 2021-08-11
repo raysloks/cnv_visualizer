@@ -9,8 +9,27 @@ h1 {
 	color: #f3f1c4;
 }
 
-canvas {
+.label {
+	position: absolute;
+	color: black;
+	left: 4px;
+	top: 4px;
+	font-size: 10px;
+}
+
+.canvas_wrapper {
+	display: block;
+	float: left;
+	width: 100%;
+	position: relative;
 	border-bottom: 2px solid black;
+}
+
+.canvas_wrapper:hover .label {
+	font-size: 12px;
+}
+
+canvas {
 	float: left;
 }
 
@@ -60,6 +79,7 @@ select {
 	pointer-events: none;
 	flex-direction: column;
 	flex-wrap: wrap;
+	z-index: 1;
 }
 
 .dropdown_content a {
