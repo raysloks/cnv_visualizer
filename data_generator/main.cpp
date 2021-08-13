@@ -8,6 +8,7 @@
 #include "GenomeData.h"
 #include "CoverageDataLoader.h"
 #include "VcfLoader.h"
+#include "BamLoader.h"
 #include "CmdOption.h"
 
 #include "Coal.h"
@@ -76,9 +77,12 @@ int main(int argc, char ** argv)
 	std::string baf_calls;
 	std::string baf_filter;
 
+	std::string bam_fname;
+
 	std::vector<CmdOption> options = {
 		CmdOption('f', "filter-vcf", "filter a gVCF file.", "long desc here yada yada", "help and example here", std::vector<CmdValue>({ CmdValue(&filter_vcf_output, true), CmdValue(&filter_vcf_key, false), CmdValue(&filter_vcf_cutoff) })),
-		CmdOption('b', "baf", "use base allele frequency as well.", "long desc", "help and example", std::vector<CmdValue>({ CmdValue(&baf_calls, true), CmdValue(&baf_filter, true) }))
+		CmdOption('b', "baf", "use base allele frequency as well.", "long desc", "help and example", std::vector<CmdValue>({ CmdValue(&baf_calls, true), CmdValue(&baf_filter, true) })),
+		CmdOption('k', "bam-test", "do htslib test.", "long desc", "help and example", std::vector<CmdValue>({ CmdValue(&bam_fname, true) }))
 	};
 
 	std::string tsv_path, html_path;
@@ -151,6 +155,14 @@ int main(int argc, char ** argv)
 			if (extension == ".html")
 				html_path = arg;
 		}
+	}
+
+	if (bam_fname.size())
+	{
+		BamLoader bam_loader;
+		GenomeData data;
+		bam_loader.load(data, bam_fname);
+		return 0;
 	}
 
 	if (filter_vcf_output.size())
