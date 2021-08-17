@@ -5,6 +5,6 @@
 class ChromosomeTemplate
 {
 public:
-    std::string name;
-    int size;
+	std::string name;
+	int size;
 };

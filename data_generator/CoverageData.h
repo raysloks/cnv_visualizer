@@ -3,14 +3,14 @@
 class CoverageData
 {
 public:
-    CoverageData();
-    CoverageData(float coverage);
+	CoverageData();
+	CoverageData(float coverage);
 
-    float density;
+	float density;
 
-    float mean;
-    float min;
-    float max;
+	float mean;
+	float min;
+	float max;
 
-    CoverageData combine(const CoverageData& rhs) const;
+	CoverageData combine(const CoverageData& rhs) const;
 };

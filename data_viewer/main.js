@@ -8,8 +8,6 @@ while (bin_sizes[bin_sizes.length - 1] < max_bin_size) {
 	bin_sizes.push(bin_sizes[bin_sizes.length - 1] * 2);
 }
 
-// let chunk_size = 2048;
-
 let resolution_modifier = 1.95;
 let initial_view_margin = 1.2;
 let min_zoom_area_width = 5;
@@ -26,7 +24,7 @@ let last_chromosome_index;
 let last_screen_to_real;
 let last_focus;
 
-let fresh_chunk_fetched = true;
+let render_out_of_date = true;
 
 let chunks = {};
 
@@ -83,16 +81,18 @@ let smooth_zoom_remaining_delay;
 function on_mouse_down_canvas(e) {
 	if (e.which != 1)
 		return;
-	zoom_area_start = (e.offsetX - e.target.width * 0.5) * screen_to_real + focus;
+	if (e.target.tagName != "CANVAS")
+		return;
+	zoom_area_start = (e.clientX - document.body.clientWidth * 0.5) * screen_to_real + focus;
 	zoom_area_end = zoom_area_start;
 	// console.log(zoom_area_start);
 
 	if (calls) {
 		if (chr.name in calls.chromosomes) {
 			for (const record of calls.chromosomes[chr.name].records) {
-				let screen_pos = (record.pos - focus) / screen_to_real + window.innerWidth * 0.5;
-				let screen_end = (record.info["END"] - focus) / screen_to_real + window.innerWidth * 0.5;
-				if (e.offsetX > screen_pos && e.offsetX < screen_end) {
+				let screen_pos = (record.pos - focus) / screen_to_real + document.body.clientWidth * 0.5;
+				let screen_end = (record.info["END"] - focus) / screen_to_real + document.body.clientWidth * 0.5;
+				if (e.clientX > screen_pos && e.clientX < screen_end) {
 					// console.log(record);
 				}
 			}
@@ -104,10 +104,11 @@ function on_mouse_up_canvas(e) {
 	if (e.which != 1 || zoom_area_start === null)
 		return;
 
-	zoom_area_end = (e.offsetX - e.target.width * 0.5) * screen_to_real + focus;
+	zoom_area_end = (e.clientX - document.body.clientWidth * 0.5) * screen_to_real + focus;
 
-	if (Math.abs(zoom_area_end - zoom_area_start) / screen_to_real >= min_zoom_area_width)
+	if (Math.abs(zoom_area_end - zoom_area_start) / screen_to_real >= min_zoom_area_width) {
 		perform_zoom(zoom_area_start, zoom_area_end);
+	}
 
 	zoom_area_start = null;
 	zoom_area_end = null;
@@ -117,7 +118,7 @@ function on_mouse_move(e) {
 	view_mouse_x = e.clientX;
 	if (zoom_area_start === null)
 		return;
-	zoom_area_end = (e.clientX - window.innerWidth * 0.5) * screen_to_real + focus;
+	zoom_area_end = (e.clientX - document.body.clientWidth * 0.5) * screen_to_real + focus;
 }
 
 function perform_zoom(start, end, smooth) {
@@ -129,27 +130,38 @@ function perform_zoom(start, end, smooth) {
 	smooth = smooth ?? use_smooth_zoom;
 
 	// if (zoom_area_width / screen_to_real >= 1)
+	smooth_zoom_target_focus = zoom_area_midpoint;
+	smooth_zoom_target_screen_to_real = zoom_area_width / document.body.clientWidth;
 	if (smooth) {
-		smooth_zoom_target_focus = zoom_area_midpoint;
-		smooth_zoom_target_screen_to_real = zoom_area_width / window.innerWidth;
 		smooth_zoom_remaining_delay = smooth_zoom_delay;
 	} else {
-		focus = zoom_area_midpoint;
-		screen_to_real = zoom_area_width / window.innerWidth;
+		focus = smooth_zoom_target_focus;
+		screen_to_real = smooth_zoom_target_screen_to_real;
 	}
 }
 
-function get_start_and_end() {
-	let half = screen_to_real * window.innerWidth * 0.5;
-	return [focus - half, focus + half];
+function get_start_and_end(smooth) {
+	// if we want smooth coordinates, we return the current start and end
+	// ( which might be in the middle of a smooth zoom )
+	if (smooth) {
+		let half = screen_to_real * document.body.clientWidth * 0.5;
+		return [focus - half, focus + half];
+	} else {
+		let half = smooth_zoom_target_screen_to_real * document.body.clientWidth * 0.5;
+		return [smooth_zoom_target_focus - half, smooth_zoom_target_focus + half];
+	}
 }
 
-function get_hash_from_state() {
+function get_hash(start, end) {
 	let hash = "#" + chromosome_names[chromosome_index];
-	const [start, end] = get_start_and_end();
 	if (start > chromosome_offsets[chromosome_index] || end < chromosome_sizes[chromosome_index] + chromosome_offsets[chromosome_index])
 		hash += ":" + Math.floor(start) + "-" + Math.floor(end);
 	return hash;
+}
+
+function get_hash_from_state() {
+	const [start, end] = get_start_and_end();
+	return get_hash(start, end);
 }
 
 function set_state_from_hash(hash) {
@@ -173,7 +185,7 @@ function check_update() {
 	if (last_chromosome_index != chromosome_index 
 		|| last_screen_to_real != screen_to_real 
 		|| last_focus != focus 
-		|| fresh_chunk_fetched 
+		|| render_out_of_date 
 		|| last_zoom_area_end != zoom_area_end) {
 
 		if (last_chromosome_index != chromosome_index) {
@@ -198,7 +210,7 @@ function check_update() {
 		last_chromosome_index = chromosome_index;
 		last_screen_to_real = screen_to_real;
 		last_focus = focus;
-		fresh_chunk_fetched = false;
+		render_out_of_date = false;
 		last_zoom_area_end = zoom_area_end;
 		render();
 	}
@@ -262,6 +274,33 @@ let views = [
 		type: "chromosome",
 		height: 450,
 		clips: [
+			{
+				height: 50,
+				label: "Base Densities",
+				data: [
+					{
+						keys: [
+							"base_a_density",
+							"base_c_density",
+							"base_g_density",
+							"base_t_density"
+						],
+						colors: [
+							[0.2, 0.0, 0.0],
+							[1.0, 1.0, 0.0],
+							[0.0, 1.0, 0.0],
+							[0.0, 0.0, 0.2],
+						],
+						labels: [
+							"A",
+							"C",
+							"G",
+							"T"
+						],
+						density_key: "base_total_density"
+					}
+				]
+			},
 			{
 				height: 50,
 				label: "Coverage Density",
@@ -362,6 +401,28 @@ let views = [
 	}
 ];
 
+function xyz_to_rgb(color) {
+	return [
+		color[0] * 3.2406 + color[1] * -1.5372 + color[2] * -0.4986,
+		color[0] * -0.9689 + color[1] * 1.8758 + color[2] * 0.0415,
+		color[0] * 0.0557 + color[1] * -0.2040 + color[2] * 1.0570
+	];
+}
+
+function rgb_to_srgb(color) {
+	return color.map(e => 1.055 * Math.pow(e, 1 / 2.4));
+}
+
+function xyz_to_srgb8(color) {
+	return rgb_to_srgb(xyz_to_rgb(color)).map(e => Math.floor(e * 255));
+}
+
+function amplify_density_values(values) {
+	values = values.map(e => Math.pow(e, 5));
+	let sum = values.reduce((acc, e) => acc + e, 0);
+	return values.map(e => e / sum);
+}
+
 let last_visible_chunks;
 
 function render(render_bin_size) {
@@ -383,9 +444,9 @@ function render(render_bin_size) {
 	let max_chunk_index = Math.floor(chr.size / (chunk_size * render_bin_size));
 
 	let visible_chunks = [];
-	let first_index = Math.floor((focus - window.innerWidth * 0.5 * screen_to_real - chr.offset) / (chunk_size * render_bin_size));
+	let first_index = Math.floor((focus - document.body.clientWidth * 0.5 * screen_to_real - chr.offset) / (chunk_size * render_bin_size));
 	first_index = Math.max(0, first_index);
-	let last_index = Math.floor((focus + window.innerWidth * 0.5 * screen_to_real - chr.offset) / (chunk_size * render_bin_size));
+	let last_index = Math.floor((focus + document.body.clientWidth * 0.5 * screen_to_real - chr.offset) / (chunk_size * render_bin_size));
 	last_index = Math.min(max_chunk_index, last_index);
 	for (let i = first_index; i <= last_index; ++i) {
 		visible_chunks.push(get_chunk(chr.name, render_bin_size, i));
@@ -421,6 +482,8 @@ function render(render_bin_size) {
 
 		for (let j = 0; j < visible_chunks.length; ++j) {
 			let data = visible_chunks[j].data[key];
+			if (!data)
+				return;
 			let density_data;
 			if (density_key !== undefined)
 				density_data = visible_chunks[j].data[density_key];
@@ -449,15 +512,47 @@ function render(render_bin_size) {
 		// ctx.stroke();
 	}
 
-	let x_start = (visible_chunks[0].offset - focus) / screen_to_real + window.innerWidth * 0.5;
+	function drawRectangles(ctx, keys, colors, x_off, x_scale, height, density_key) {
+
+		let x;
+
+		for (let j = 0; j < visible_chunks.length; ++j) {
+			let data = keys.map(e => visible_chunks[j].data[e]);
+			if (data.some(e => !e))
+				return;
+			let density_data;
+			if (density_key !== undefined)
+				density_data = visible_chunks[j].data[density_key];
+			for (let i = 0; i < data[0].length; ++i) {
+				let values = data.map(e => e[i]);
+				if (density_data)
+					if (density_data[i] != 0)
+						values = values.map(e => e / density_data[i]);
+					else
+						continue;
+				values = amplify_density_values(values);
+				let color = colors.map((e, i) => e.map(e => e * values[i]))
+					.reduce((acc, c) => acc.map((e, i) => e + c[i]), [0, 0, 0]);
+				//color = xyz_to_srgb8(color);
+				color = rgb_to_srgb(color);
+				color = color.map(e => Math.floor(e * 255));
+				x = x_off + i * x_scale;
+				ctx.fillStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, 1.0)`;
+				ctx.fillRect(x, 0, x_scale * 2.0, height);
+			}
+			x_off += data[0].length * x_scale;
+		}
+	}
+
+	let x_start = (visible_chunks[0].offset - focus) / screen_to_real + document.body.clientWidth * 0.5;
 
 	let view = views[0];
 	for (const clip of view.clips) {
 
 		let canvas = clip.canvas;
 
-		if (canvas.width != window.innerWidth)
-			canvas.width = window.innerWidth;
+		if (canvas.width != document.body.clientWidth)
+			canvas.width = document.body.clientWidth;
 
 		let ctx = canvas.getContext("2d");
 
@@ -478,18 +573,6 @@ function render(render_bin_size) {
 			}
 		}
 
-		if (zoom_area_start) {
-			let zoom_area_screen_start = (zoom_area_start - focus) / screen_to_real + canvas.width * 0.5;
-			let zoom_area_screen_end = view_mouse_x;
-			let zoom_area_screen_left = Math.min(zoom_area_screen_start, zoom_area_screen_end);
-			let zoom_area_screen_right = Math.max(zoom_area_screen_start, zoom_area_screen_end);
-			let zoom_area_screen_width = zoom_area_screen_right - zoom_area_screen_left;
-			ctx.fillStyle = "rgba(100, 100, 240, 0.5)";
-			if (zoom_area_screen_width < min_zoom_area_width)
-				ctx.fillStyle = "rgba(100, 100, 240, 0.25)";
-			ctx.fillRect(zoom_area_screen_left, 0, zoom_area_screen_width, canvas.height);
-		}
-
 		if (clip.lines) {
 			for (const line of clip.lines) {
 				ctx.save();
@@ -506,10 +589,25 @@ function render(render_bin_size) {
 		clip.path = new Path2D();
 
 		for (let data of clip.data) {
-			drawGraph(clip.path, data.key, x_start, render_bin_size / screen_to_real, clip.height - data.y_offset, -data.y_scale, data.density_key);
+			if (data.key)
+				drawGraph(clip.path, data.key, x_start, render_bin_size / screen_to_real, clip.height - data.y_offset, -data.y_scale, data.density_key);
+			if (data.keys)
+				drawRectangles(ctx, data.keys, data.colors, x_start, render_bin_size / screen_to_real, canvas.height, data.density_key);
 		}
 
 		ctx.stroke(clip.path);
+
+		if (zoom_area_start) {
+			let zoom_area_screen_start = (zoom_area_start - focus) / screen_to_real + canvas.width * 0.5;
+			let zoom_area_screen_end = view_mouse_x;
+			let zoom_area_screen_left = Math.min(zoom_area_screen_start, zoom_area_screen_end);
+			let zoom_area_screen_right = Math.max(zoom_area_screen_start, zoom_area_screen_end);
+			let zoom_area_screen_width = zoom_area_screen_right - zoom_area_screen_left;
+			ctx.fillStyle = "rgba(100, 100, 240, 0.5)";
+			if (zoom_area_screen_width < min_zoom_area_width)
+				ctx.fillStyle = "rgba(100, 100, 240, 0.25)";
+			ctx.fillRect(zoom_area_screen_left, 0, zoom_area_screen_width, canvas.height);
+		}
 	}
 
 	{
@@ -517,8 +615,8 @@ function render(render_bin_size) {
 		let canvas = clip.canvas;
 		let ctx = canvas.getContext("2d");
 
-		if (canvas.width != window.innerWidth)
-			canvas.width = window.innerWidth;
+		if (canvas.width != document.body.clientWidth)
+			canvas.width = document.body.clientWidth;
 
 		ctx.setTransform(1, 0, 0, 1, 0, 0);
 		ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -530,11 +628,11 @@ function render(render_bin_size) {
 		ctx.beginPath();
 		let total_size = chromosome_sizes.reduce((a, e) => a + e);
 		let x = 0;
-		let [start, end] = get_start_and_end();
+		let [start, end] = get_start_and_end(smooth = true);
 		start = Math.max(0, start - chr.offset) / chr.size;
 		end = Math.min(chr.size, end - chr.offset) / chr.size;
 		for (let i = 0; i < chromosome_names.length - 1; ++i) {
-			let stride = chromosome_sizes[i] * window.innerWidth / total_size;
+			let stride = chromosome_sizes[i] * document.body.clientWidth / total_size;
 			if (i == chr.index) {
 				start = x + stride * start;
 				end = x + stride * end;
@@ -642,10 +740,22 @@ function fetch_chunk(chr, size, index) {
 			log2_max.push(view.getFloat32(off + 8 + i * 16 + 12, true));
 		} */
 
-		fresh_chunk_fetched = true;
+		render_out_of_date = true;
 
 		// console.log(chunk_identifier);
 	});
+}
+
+function rgb_to_hex(color) {
+	return "#" + (1 << 24 | color[0] << 16 | color[1] << 8 | color[2]).toString(16).slice(1);
+}
+
+function hex_to_rgb(color) {
+	return [
+		parseInt(color.slice(1, 3), 16),
+		parseInt(color.slice(3, 5), 16),
+		parseInt(color.slice(5, 7), 16)
+	];
 }
 
 window.onload = function () {
@@ -669,6 +779,23 @@ window.onload = function () {
 			label.innerHTML = clip.label;
 			label.className = "label";
 			clip.wrapper.appendChild(label);
+
+			if (clip.data) {
+				for (let data of clip.data) {
+					if (data.colors) {
+						for (let i = 0; i < data.colors.length; ++i) {
+							let input = document.createElement("input");
+							input.type = "color";
+							input.value = rgb_to_hex(data.colors[i].map(e => Math.floor(e * 255)));
+							input.oninput = (ev) => {
+								data.colors[i] = hex_to_rgb(ev.target.value).map(e => e / 255);
+								render_out_of_date = true;
+							};
+							label.appendChild(input);
+						}
+					}
+				}
+			}
 		}
 	}
 
@@ -682,7 +809,7 @@ window.onload = function () {
 	.then(response => response.json())
 	.then(data => {
 		calls = data;
-		fresh_chunk_fetched = true;
+		render_out_of_date = true;
 	});
 
 	window.requestAnimationFrame(on_animation_frame);

@@ -37,7 +37,7 @@ int VcfLoader::load(VcfData& data, std::istream& is)
 	return 0;
 }
 
-int VcfLoader::filterBaf(std::istream& is, std::ostream& os)
+int VcfLoader::createBafFilter(std::istream& is, std::ostream& os)
 {
 	std::cout << "compiling filter..." << std::endl;
 	std::cout << "key: " << baf_key << std::endl;
@@ -59,6 +59,7 @@ int VcfLoader::filterBaf(std::istream& is, std::ostream& os)
 	float last_freqs[4] = {};
 
 	int64_t allele_count = 0;
+	int64_t pos_count = 0;
 	int64_t progress_notify = 0;
 	
 	float average_freq_accumulator = 0.0f;
@@ -93,6 +94,7 @@ int VcfLoader::filterBaf(std::istream& is, std::ostream& os)
 			{
 				progress_notify = 1;
 				std::cout << allele_count << " alleles passed the filter so far..." << std::endl;
+				std::cout << pos_count << " positions recorded so far..." << std::endl;
 				if (average_freq_accumulator_divisor > 0)
 					std::cout << "average frequency is " << average_freq_accumulator / average_freq_accumulator_divisor << "." << std::endl;
 				std::cout << info_count << " | " << no_info_count << std::endl;
@@ -104,13 +106,14 @@ int VcfLoader::filterBaf(std::istream& is, std::ostream& os)
 			{
 				if (last_ref != 0)
 				{
+					++pos_count;
 					float pos_ref_freq = 1.0f;
 					for (size_t i = 0; i < 4; ++i)
 						pos_ref_freq -= last_freqs[i];
-					last_freqs[base_to_index[last_ref]] = pos_ref_freq;
+					//last_freqs[base_to_index[last_ref]] = pos_ref_freq;
 					for (size_t i = 0; i < 4; ++i)
 					{
-						if (last_freqs[i] > baf_cutoff)
+						if (i != base_to_index[last_ref] && last_freqs[i] > baf_cutoff)
 						{
 							// this block is read as an int64
 							os.put(index_to_base[i]);
@@ -118,8 +121,16 @@ int VcfLoader::filterBaf(std::istream& is, std::ostream& os)
 							os.write((char*)&chr_index, 3);
 							// --
 							os.write((char*)&last_freqs[i], sizeof(last_freqs[i]));
+							++allele_count;
 						}
 					}
+
+					// this block is read as an int64
+					os.put(index_to_base[last_ref] << 1);
+					os.write((char*)&last_pos, sizeof(last_pos));
+					os.write((char*)&chr_index, 3);
+					// --
+					os.write((char*)&pos_ref_freq, sizeof(pos_ref_freq));
 				}
 				last_pos = record.pos;
 				last_ref = 0;
@@ -152,7 +163,6 @@ int VcfLoader::filterBaf(std::istream& is, std::ostream& os)
 
 					last_ref = record.ref[0];
 					last_freqs[base_to_index[alt]] = freq;
-					++allele_count;
 				}
 			}
 			else
@@ -170,7 +180,7 @@ int VcfLoader::filterBaf(std::istream& is, std::ostream& os)
 	return 0;
 }
 
-int VcfLoader::filterBafData(GenomeData& data, std::istream& is_filter, std::istream& is_calls)
+int VcfLoader::filterBafCalls(GenomeData& data, std::istream& is_filter, std::istream& is_calls)
 {
 	std::cout << "filtering..." << std::endl;
 
@@ -184,11 +194,14 @@ int VcfLoader::filterBafData(GenomeData& data, std::istream& is_filter, std::ist
 	int64_t filter_last_key = 0;
 	float filter_last_freq = 0.0f;
 
+	bool current_filter_pos_has_call = false;
+
 	int64_t calls_chr_index = -1;
 	std::string calls_last_chr_name;
 
 	int64_t progress_notify = 0;
 	int64_t out_of_bounds_count = 0;
+	int64_t ref_count = 0;
 	int64_t match_count = 0;
 	int64_t miss_count = 0;
 	
@@ -235,6 +248,21 @@ int VcfLoader::filterBafData(GenomeData& data, std::istream& is_filter, std::ist
 				}
 				is_filter.read((char*)&filter_last_key, sizeof(filter_last_key));
 				is_filter.read((char*)&filter_last_freq, sizeof(filter_last_freq));
+
+				if (filter_last_key & 0b10000000)
+				{
+					if (!current_filter_pos_has_call)
+					{
+						int32_t filter_pos = (filter_last_key >> 8) & 0xffffffff;
+						int pos = (filter_pos - chr_data->offset) / chr_data->scale;
+						if (pos < 0 || pos >= chr_data->baf_data.size())
+							++out_of_bounds_count;
+						else
+							chr_data->baf_data[pos] += filter_last_freq;
+						++ref_count;
+					}
+					current_filter_pos_has_call = false;
+				}
 			}
 
 			if (++progress_notify > 1000)
@@ -247,10 +275,12 @@ int VcfLoader::filterBafData(GenomeData& data, std::istream& is_filter, std::ist
 				std::cout << filter_pos << " " << record.pos << std::endl;
 				std::cout << filter_alt << " " << alt << std::endl;
 				std::cout << record.ref << std::endl;
+				std::cout << ref_count << std::endl;
 				std::cout << match_count << std::endl;
 				std::cout << miss_count << std::endl;
 			}
 
+			current_filter_pos_has_call = true;
 			if (filter_last_key == calls_key)
 			{
 				int pos = (record.pos - chr_data->offset) / chr_data->scale;

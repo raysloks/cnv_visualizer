@@ -8,8 +8,8 @@
 class FakeDataGenerator
 {
 public:
-    ChromosomeData generateFakeChromosomeData(const ChromosomeTemplate& chr_template, int scale);
+	ChromosomeData generateFakeChromosomeData(const ChromosomeTemplate& chr_template, int scale);
 
 private:
-    std::default_random_engine rng;
+	std::default_random_engine rng;
 };

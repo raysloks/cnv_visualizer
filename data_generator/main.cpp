@@ -70,9 +70,11 @@ int main(int argc, char ** argv)
     //     chr_data.save("vscode/data/");
     // }
 
-	std::string filter_vcf_output;
-	std::string filter_vcf_key;
-	float filter_vcf_cutoff;
+	bool help = false;
+
+	std::string create_baf_filter_output;
+	std::string create_baf_filter_key;
+	float create_baf_filter_cutoff;
 
 	std::string baf_calls;
 	std::string baf_filter;
@@ -80,9 +82,14 @@ int main(int argc, char ** argv)
 	std::string bam_fname;
 
 	std::vector<CmdOption> options = {
-		CmdOption('f', "filter-vcf", "filter a gVCF file.", "long desc here yada yada", "help and example here", std::vector<CmdValue>({ CmdValue(&filter_vcf_output, true), CmdValue(&filter_vcf_key, false), CmdValue(&filter_vcf_cutoff) })),
-		CmdOption('b', "baf", "use base allele frequency as well.", "long desc", "help and example", std::vector<CmdValue>({ CmdValue(&baf_calls, true), CmdValue(&baf_filter, true) })),
-		CmdOption('k', "bam-test", "do htslib test.", "long desc", "help and example", std::vector<CmdValue>({ CmdValue(&bam_fname, true) }))
+		CmdOption('h', "help", "Show this text.", 
+			"long help desc", "help help and help example", std::vector<CmdValue>({ CmdValue(&help)})),
+		CmdOption('f', "filter-create", "Create a .baf filter file from a genomic .vcf allele database file (such as gnomAD) piped into standard input.", 
+			"long desc here yada yada", "help and example here", std::vector<CmdValue>({ CmdValue(&create_baf_filter_output, true), CmdValue(&create_baf_filter_key, false), CmdValue(&create_baf_filter_cutoff) })),
+		CmdOption('b', "baf", "Add BAF data to final output using a genomic .vcf calls file and a .baf filter file created with '-f' or '--filter-create'.", 
+			"long desc", "help and example", std::vector<CmdValue>({ CmdValue(&baf_calls, true), CmdValue(&baf_filter, true) })),
+		CmdOption('s', "staining", "Add nucleotide base frequency data to final output using a .bam file.", 
+			"long desc", "help and example", std::vector<CmdValue>({ CmdValue(&bam_fname, true) }))
 	};
 
 	std::string tsv_path, html_path;
@@ -157,21 +164,23 @@ int main(int argc, char ** argv)
 		}
 	}
 
-	if (bam_fname.size())
+	if (help)
 	{
-		BamLoader bam_loader;
-		GenomeData data;
-		bam_loader.load(data, bam_fname);
+		for (auto& option : options)
+		{
+			std::cout << "-" << option.flag_short << "\t--" << option.flag_long << std::endl;
+			std::cout << "\t" << option.short_description << std::endl;
+		}
 		return 0;
 	}
 
-	if (filter_vcf_output.size())
+	if (create_baf_filter_output.size())
 	{
-		std::ofstream vcf_os(filter_vcf_output, std::ofstream::binary | std::ofstream::trunc);
+		std::ofstream vcf_os(create_baf_filter_output, std::ofstream::binary | std::ofstream::trunc);
 		VcfLoader vcf_loader;
-		vcf_loader.baf_key = filter_vcf_key;
-		vcf_loader.baf_cutoff = filter_vcf_cutoff;
-		vcf_loader.filterBaf(std::cin, vcf_os);
+		vcf_loader.baf_key = create_baf_filter_key;
+		vcf_loader.baf_cutoff = create_baf_filter_cutoff;
+		vcf_loader.createBafFilter(std::cin, vcf_os);
 	}
 
 	if (tsv_path.size())
@@ -190,11 +199,21 @@ int main(int argc, char ** argv)
 			vcf_loader.load(data.vcf, vcf_is);
 		}
 
+		if (bam_fname.size())
+		{
+			std::cout << "reading bam..." << std::endl;
+			BamLoader bam_loader;
+			bam_loader.load(data, bam_fname);
+			std::cout << "read bam." << std::endl;
+		}
+
 		if (baf_calls.size())
 		{
+			std::cout << "filtering baf..." << std::endl;
 			std::ifstream baf_calls_is(baf_calls);
 			std::ifstream baf_filter_is(baf_filter);
-			vcf_loader.filterBafData(data, baf_filter_is, baf_calls_is);
+			vcf_loader.filterBafCalls(data, baf_filter_is, baf_calls_is);
+			std::cout << "filtered baf." << std::endl;
 		}
 
 		std::string path = tsv_path;
@@ -202,7 +221,9 @@ int main(int argc, char ** argv)
 		data.name = path.substr(path.find_last_of('/') + 1);
 		path += "/vis/";
 
+		std::cout << "saving data..." << std::endl;
 		data.save(path, html_path);
+		std::cout << "saved data." << std::endl;
 	}
 
     return 0;

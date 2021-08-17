@@ -7,5 +7,5 @@
 class BamLoader
 {
 public:
-    int load(GenomeData& data, const std::string& fname);
+	int load(GenomeData& data, const std::string& fname);
 };

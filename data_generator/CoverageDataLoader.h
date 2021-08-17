@@ -7,9 +7,9 @@ class GenomeData;
 class CoverageDataLoader
 {
 public:
-    CoverageDataLoader(int scale);
+	CoverageDataLoader(int scale);
 
-    int scale;
+	int scale;
 
-    int load(GenomeData& data, std::istream& is);
+	int load(GenomeData& data, std::istream& is);
 };

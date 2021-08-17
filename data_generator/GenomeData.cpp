@@ -1,6 +1,7 @@
 #include "GenomeData.h"
 
 #include <fstream>
+#include <thread>
 
 #include "DocumentTemplate.h"
 
@@ -28,14 +29,19 @@ void GenomeData::save(const std::string& path, const std::string& template_path)
 		"baf_top_density",
 		"baf_mid_density",
 		"baf_bot_density",
-		"baf_mid_mean"
+		"baf_mid_mean",
+		"base_total_density",
+		"base_a_density",
+		"base_c_density",
+		"base_g_density",
+		"base_t_density"
 	};
 	for (size_t i = 0; i < data_lines.size(); ++i)
 	{
 		doc.data["data_lines[" + std::to_string(i) + "]"] = data_lines[i];
 	}
 
-    std::ofstream f(path + "index.html", std::ofstream::trunc);
+	std::ofstream f(path + "index.html", std::ofstream::trunc);
 	doc.parse(f);
 	f.close();
 
@@ -45,8 +51,11 @@ void GenomeData::save(const std::string& path, const std::string& template_path)
 		coal.printJson(f);
 	}
 
-    for (auto& chr : chromosomes)
-        chr.save(path);
+	std::vector<std::thread> threads;
+	for (auto& chr : chromosomes)
+		threads.emplace_back([chr, path]() { chr.save(path); });
+	for (auto& thread : threads)
+		thread.join();
 }
 
 int GenomeData::addBafData(const VcfData& baf)
@@ -117,11 +126,11 @@ Coal GenomeData::getCallData() const
 
 ChromosomeData& GenomeData::getChromosomeByName(const std::string& name)
 {
-    for (auto& chr : chromosomes)
-        if (chr.chr_template.name == name)
-            return chr;
+	for (auto& chr : chromosomes)
+		if (chr.chr_template.name == name)
+			return chr;
 
-    chromosomes.push_back(ChromosomeData{ChromosomeTemplate{name}});
+	chromosomes.push_back(ChromosomeData{ChromosomeTemplate{name}});
 
-    return chromosomes.back();
+	return chromosomes.back();
 }
