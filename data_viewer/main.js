@@ -14,7 +14,7 @@ let min_zoom_area_width = 5;
 
 let chr = {};
 
-let chromosome_index = 0;
+let chromosome_index = null;
 let screen_to_real = max_bin_size;
 let focus = 0;
 
@@ -160,6 +160,8 @@ function get_hash(start, end) {
 }
 
 function get_hash_from_state() {
+	if (chromosome_index === null)
+		return "";
 	const [start, end] = get_start_and_end();
 	return get_hash(start, end);
 }
@@ -177,6 +179,8 @@ function set_state_from_hash(hash) {
 			let half_size = chromosome_sizes[chromosome_index] * initial_view_margin * 0.5;
 			perform_zoom(midpoint - half_size, midpoint + half_size, same_index && undefined);
 		}
+	} else {
+		chromosome_index = null;
 	}
 }
 
@@ -198,9 +202,12 @@ function check_update() {
 		let hash = get_hash_from_state();
 		if (hash != undefined && hash != window.location.hash)
 			window.location.hash = hash;
-		let current_chromosome_dropdown_a = document.getElementById("chromosome_dropdown_content").children[chromosome_index];
-		if (current_chromosome_dropdown_a.href != hash)
-			current_chromosome_dropdown_a.href = hash;
+		
+		if (chromosome_index !== null) {
+			let current_chromosome_dropdown_a = document.getElementById("chromosome_dropdown_content").children[chromosome_index];
+			if (current_chromosome_dropdown_a.href != hash)
+				current_chromosome_dropdown_a.href = hash;
+		}
 
 		chr.index = chromosome_index;
 		chr.name = chromosome_names[chr.index];
@@ -297,6 +304,7 @@ let views = [
 							"G",
 							"T"
 						],
+						amplification: 5,
 						density_key: "base_total_density"
 					}
 				]
@@ -395,7 +403,31 @@ let views = [
 		clips: [
 			{
 				height: 80,
-				label: "Overview"
+				label: "Overview",
+				data: [
+					{
+						keys: [
+							"base_a_density",
+							"base_c_density",
+							"base_g_density",
+							"base_t_density"
+						],
+						colors: [
+							[0.2, 0.0, 0.0],
+							[1.0, 1.0, 0.0],
+							[0.0, 1.0, 0.0],
+							[0.0, 0.0, 0.2],
+						],
+						labels: [
+							"A",
+							"C",
+							"G",
+							"T"
+						],
+						amplification: 5,
+						density_key: "base_total_density"
+					}
+				]
 			}
 		]
 	}
@@ -417,15 +449,116 @@ function xyz_to_srgb8(color) {
 	return rgb_to_srgb(xyz_to_rgb(color)).map(e => Math.floor(e * 255));
 }
 
-function amplify_density_values(values) {
-	values = values.map(e => Math.pow(e, 5));
+function amplify_density_values(values, exponent) {
+	values = values.map(e => Math.pow(e, exponent));
 	let sum = values.reduce((acc, e) => acc + e, 0);
 	return values.map(e => e / sum);
 }
 
 let last_visible_chunks;
 
+
+function drawGraph(path, chunks, key, x_off, x_scale, y_off, y_scale, density_key) {
+	// ctx.beginPath();
+
+	let strokes = 0;
+	let x;
+	let y;
+
+	for (let j = 0; j < chunks.length; ++j) {
+		let data = chunks[j].data[key];
+		if (!data)
+			return;
+		let density_data;
+		if (density_key !== undefined)
+			density_data = chunks[j].data[density_key];
+		for (let i = 0; i < data.length; ++i) {
+			let value = data[i];
+			if (density_data)
+				if (density_data[i] == 0) {
+					if (strokes == 1) {
+						path.lineTo(x + 0.5 * x_scale, y);
+						path.lineTo(x - 0.5 * x_scale, y);
+					}
+					strokes = 0;
+					continue;
+				}
+			x = x_off + i * x_scale;
+			y = y_off + value * y_scale;
+			if (strokes > 0)
+				path.lineTo(x, y);
+			else
+				path.moveTo(x, y);
+			++strokes;
+		}
+		x_off += data.length * x_scale;
+	}
+
+	// ctx.stroke();
+}
+
+function drawRectangles(ctx, chunks, keys, colors, x_off, x_scale, y, height, amplification, density_key) {
+
+	let x;
+
+	for (let j = 0; j < chunks.length; ++j) {
+		let data = keys.map(e => chunks[j].data[e]);
+		if (data.some(e => !e))
+			return;
+		let density_data;
+		if (density_key !== undefined)
+			density_data = chunks[j].data[density_key];
+		for (let i = 0; i < data[0].length; ++i) {
+			let values = data.map(e => e[i]);
+			if (density_data)
+				if (density_data[i] != 0)
+					values = values.map(e => e / density_data[i]);
+				else
+					continue;
+			values = amplify_density_values(values, amplification);
+			let color = colors.map((e, i) => e.map(e => e * values[i]))
+				.reduce((acc, c) => acc.map((e, i) => e + c[i]), [0, 0, 0]);
+			//color = xyz_to_srgb8(color);
+			color = rgb_to_srgb(color);
+			color = color.map(e => Math.floor(e * 255));
+			x = x_off + i * x_scale;
+			ctx.fillStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, 1.0)`;
+			ctx.fillRect(x, y, x_scale * 2.0, height);
+		}
+		x_off += data[0].length * x_scale;
+	}
+}
+
 function render(render_bin_size) {
+
+	{
+		let view = views[1];
+		let clip = view.clips[0];
+		for (let i = 0; i < clip.canvases.length; ++i) {
+			let canvas = clip.canvases[i];
+			if (canvas.width != canvas.parentElement.clientWidth) {
+	
+				let max_chunk_index = Math.floor(chromosome_sizes[i] / (chunk_size * max_bin_size));
+				let chunks = [];
+				for (let j = 0; j <= max_chunk_index; ++j) {
+					chunks.push(get_chunk(chromosome_names[i], max_bin_size, j));
+				}
+				
+				if (chunks.some(e => e === null))
+					continue;
+
+				canvas.width = canvas.parentElement.clientWidth;
+
+				let ctx = canvas.getContext("2d");
+		
+				ctx.setTransform(1, 0, 0, 1, 0, 0);
+				ctx.clearRect(0, 0, canvas.width, canvas.height);
+	
+				drawRectangles(ctx, chunks, clip.keys, clip.colors, 0, max_bin_size / chromosome_sizes[i] * canvas.width, 30, 20, clip.amplification, clip.density_key);
+
+			}
+		}
+	}
 
 	if (render_bin_size === undefined) {
 		
@@ -473,77 +606,6 @@ function render(render_bin_size) {
 	let visible_chunks_changed = !visible_chunks.every((e, i) => e === last_visible_chunks[i]);
 	last_visible_chunks = visible_chunks;
 
-	function drawGraph(path, key, x_off, x_scale, y_off, y_scale, density_key) {
-		// ctx.beginPath();
-
-		let strokes = 0;
-		let x;
-		let y;
-
-		for (let j = 0; j < visible_chunks.length; ++j) {
-			let data = visible_chunks[j].data[key];
-			if (!data)
-				return;
-			let density_data;
-			if (density_key !== undefined)
-				density_data = visible_chunks[j].data[density_key];
-			for (let i = 0; i < data.length; ++i) {
-				let value = data[i];
-				if (density_data)
-					if (density_data[i] == 0) {
-						if (strokes == 1) {
-							path.lineTo(x + 0.5 * x_scale, y);
-							path.lineTo(x - 0.5 * x_scale, y);
-						}
-						strokes = 0;
-						continue;
-					}
-				x = x_off + i * x_scale;
-				y = y_off + value * y_scale;
-				if (strokes > 0)
-					path.lineTo(x, y);
-				else
-					path.moveTo(x, y);
-				++strokes;
-			}
-			x_off += data.length * x_scale;
-		}
-
-		// ctx.stroke();
-	}
-
-	function drawRectangles(ctx, keys, colors, x_off, x_scale, height, density_key) {
-
-		let x;
-
-		for (let j = 0; j < visible_chunks.length; ++j) {
-			let data = keys.map(e => visible_chunks[j].data[e]);
-			if (data.some(e => !e))
-				return;
-			let density_data;
-			if (density_key !== undefined)
-				density_data = visible_chunks[j].data[density_key];
-			for (let i = 0; i < data[0].length; ++i) {
-				let values = data.map(e => e[i]);
-				if (density_data)
-					if (density_data[i] != 0)
-						values = values.map(e => e / density_data[i]);
-					else
-						continue;
-				values = amplify_density_values(values);
-				let color = colors.map((e, i) => e.map(e => e * values[i]))
-					.reduce((acc, c) => acc.map((e, i) => e + c[i]), [0, 0, 0]);
-				//color = xyz_to_srgb8(color);
-				color = rgb_to_srgb(color);
-				color = color.map(e => Math.floor(e * 255));
-				x = x_off + i * x_scale;
-				ctx.fillStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, 1.0)`;
-				ctx.fillRect(x, 0, x_scale * 2.0, height);
-			}
-			x_off += data[0].length * x_scale;
-		}
-	}
-
 	let x_start = (visible_chunks[0].offset - focus) / screen_to_real + document.body.clientWidth * 0.5;
 
 	let view = views[0];
@@ -590,9 +652,9 @@ function render(render_bin_size) {
 
 		for (let data of clip.data) {
 			if (data.key)
-				drawGraph(clip.path, data.key, x_start, render_bin_size / screen_to_real, clip.height - data.y_offset, -data.y_scale, data.density_key);
+				drawGraph(clip.path, visible_chunks, data.key, x_start, render_bin_size / screen_to_real, clip.height - data.y_offset, -data.y_scale, data.density_key);
 			if (data.keys)
-				drawRectangles(ctx, data.keys, data.colors, x_start, render_bin_size / screen_to_real, canvas.height, data.density_key);
+				drawRectangles(ctx, visible_chunks, data.keys, data.colors, x_start, render_bin_size / screen_to_real, 0, canvas.height, data.amplification, data.density_key);
 		}
 
 		ctx.stroke(clip.path);
@@ -610,7 +672,7 @@ function render(render_bin_size) {
 		}
 	}
 
-	{
+	if (false) {
 		let clip = views[1].clips[0];
 		let canvas = clip.canvas;
 		let ctx = canvas.getContext("2d");
@@ -646,25 +708,6 @@ function render(render_bin_size) {
 		ctx.fillStyle = "rgba(100, 100, 240, 0.5)";
 		ctx.fillRect(start, y_top, end - start, height);
 	}
-
-	/*{
-		ctx.beginPath();
-		let y = 0;
-		for (const view of views) {
-			if (view.clips) {
-				let clip_y = y;
-				for (const clip of view.clips) {
-					clip_y += clip.height;
-					ctx.moveTo(0, clip_y);
-					ctx.lineTo(canvas.width, clip_y);
-				}
-			}
-			y += view.height;
-			ctx.moveTo(0, y);
-			ctx.lineTo(canvas.width, y);
-		}
-		ctx.stroke();
-	}*/
 }
 
 function get_chunk(chr, size, index) {
@@ -706,40 +749,6 @@ function fetch_chunk(chr, size, index) {
 
 		// console.log(chunk);
 
-		/* let view = new DataView(arrayBuffer);
-		let scale = view.getInt32(0, true);
-		let baf_offset = view.getInt32(4, true);
-		let baf_size = view.getInt32(8, true);
-
-		let off = 12 + baf_size * 20;
-
-		let log2_offset = view.getInt32(off, true);
-		let log2_size = view.getInt32(off + 4, true);
-
-		chunk.baf_offset = baf_offset;
-		chunk.baf_size = baf_size;
-		chunk.log2_offset = log2_offset;
-		chunk.log2_size = log2_size;
-
-		chunk.data = {}
-
-		let log2_density = [];
-		let log2_min = [];
-		let log2_mean = [];
-		let log2_max = [];
-
-		chunk.data["log2_density"] = log2_density;
-		chunk.data["log2_min"] = log2_min;
-		chunk.data["log2_mean"] = log2_mean;
-		chunk.data["log2_max"] = log2_max;
-
-		for (let i = 0; i < log2_size; ++i) {
-			log2_density.push(view.getFloat32(off + 8 + i * 16 + 0, true));
-			log2_min.push(view.getFloat32(off + 8 + i * 16 + 4, true));
-			log2_mean.push(view.getFloat32(off + 8 + i * 16 + 8, true));
-			log2_max.push(view.getFloat32(off + 8 + i * 16 + 12, true));
-		} */
-
 		render_out_of_date = true;
 
 		// console.log(chunk_identifier);
@@ -759,7 +768,7 @@ function hex_to_rgb(color) {
 }
 
 window.onload = function () {
-	window.addEventListener("mousedown", on_mouse_down_canvas);
+	//window.addEventListener("mousedown", on_mouse_down_canvas);
 	window.addEventListener("mouseup", on_mouse_up_canvas);
 	window.addEventListener("mousemove", on_mouse_move);
 
@@ -770,15 +779,61 @@ window.onload = function () {
 			clip.wrapper.className = "canvas_wrapper";
 			views_element.appendChild(clip.wrapper);
 
-			clip.canvas = document.createElement("canvas");
-			clip.canvas.height = clip.height;
-			clip.canvas.className = "canvas_cursor_text";
-			clip.wrapper.appendChild(clip.canvas);
+			if (view.type == "chromosome") {
+				clip.canvas = document.createElement("canvas");
+				clip.canvas.height = clip.height;
+				clip.canvas.className = "canvas_cursor_text";
+				clip.canvas.addEventListener("mousedown", on_mouse_down_canvas);
+				clip.wrapper.appendChild(clip.canvas);
+			}
+			if (view.type == "overview") {
+				clip.canvases = [];
+				let total_size = chromosome_sizes.reduce((a, e) => a + e);
+				for (let i = 0; i < chromosome_sizes.length; ++i) {
+					let a = document.createElement("a");
+					a.href = "#" + chromosome_names[i];
+					a.classList.add("overview_link");
+					a.style.width = chromosome_sizes[i] / total_size * 100 + "%";
+					if (i != 0)
+						a.classList.add("overview_link_border_left");
+					if (i != chromosome_sizes.length - 1)
+						a.classList.add("overview_link_border_right");
+					clip.wrapper.appendChild(a);
+
+					let canvas = document.createElement("canvas");
+					canvas.height = clip.height;
+					clip.canvases.push(canvas);
+					a.appendChild(canvas);
+
+					let overlay = document.createElement("div");
+					overlay.classList.add("overlay");
+					a.appendChild(overlay);
+				}
+			}
 			
+			let overlay = document.createElement("div");
+			overlay.className = "clip_overlay";
+			clip.wrapper.appendChild(overlay);
+
 			let label = document.createElement("a");
 			label.innerHTML = clip.label;
 			label.className = "label";
-			clip.wrapper.appendChild(label);
+			overlay.appendChild(label);
+			
+			let cogwheel = document.createElement("img");
+			cogwheel.className = "cogwheel";
+			cogwheel.src = "../../../../cnv_visualizer/data_viewer/cogwheel.svg";
+			cogwheel.alt = "Options";
+			overlay.appendChild(cogwheel);
+
+			let options_panel = document.createElement("div");
+			options_panel.className = "options_panel";
+			options_panel.style.display = "none";
+			overlay.appendChild(options_panel);
+
+			cogwheel.onclick = () => {
+				options_panel.style.display = options_panel.style.display == "none" ? "block" : "none";
+			};
 
 			if (clip.data) {
 				for (let data of clip.data) {
@@ -791,8 +846,21 @@ window.onload = function () {
 								data.colors[i] = hex_to_rgb(ev.target.value).map(e => e / 255);
 								render_out_of_date = true;
 							};
-							label.appendChild(input);
+							options_panel.appendChild(input);
 						}
+					}
+					if (data.amplification) {
+						let slider = document.createElement("input");
+						slider.type = "range";
+						slider.min = "1";
+						slider.max = "10";
+						slider.step = "0.01";
+						slider.value = data.amplification;
+						slider.oninput = (ev) => {
+							data.amplification = parseFloat(ev.target.value);
+							render_out_of_date = true;
+						};
+						options_panel.appendChild(slider);
 					}
 				}
 			}
