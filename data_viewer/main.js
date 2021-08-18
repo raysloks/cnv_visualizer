@@ -549,12 +549,14 @@ function render(render_bin_size) {
 
 				canvas.width = canvas.parentElement.clientWidth;
 
+				let data = clip.data[0];
+
 				let ctx = canvas.getContext("2d");
 		
 				ctx.setTransform(1, 0, 0, 1, 0, 0);
 				ctx.clearRect(0, 0, canvas.width, canvas.height);
 	
-				drawRectangles(ctx, chunks, clip.keys, clip.colors, 0, max_bin_size / chromosome_sizes[i] * canvas.width, 30, 20, clip.amplification, clip.density_key);
+				drawRectangles(ctx, chunks, data.keys, data.colors, 0, max_bin_size / chromosome_sizes[i] * canvas.width, 30, 20, data.amplification, data.density_key);
 
 			}
 		}
