@@ -2,6 +2,7 @@
 
 #include <map>
 #include <iostream>
+#include <algorithm>
 
 #include "GenomeData.h"
 
@@ -20,8 +21,6 @@ int CoverageDataLoader::load(GenomeData& data, std::istream& is)
 		if (line[0] != '@')
 			break;
 	}
-
-	bool has_warned_scale_mismatch = false;
 
 	std::string last_chr;
 
@@ -43,12 +42,19 @@ int CoverageDataLoader::load(GenomeData& data, std::istream& is)
 
 		coverage_data[chr_name][(reg_start + reg_end) / 2] = coverage;
 
-		if (!has_warned_scale_mismatch && reg_end - reg_start != scale - 1)
+		if (reg_end - reg_start != scale - 1)
 		{
-			std::cerr << "WARNING: scale mismatch, stopping read." << std::endl;
-			// scale = reg_end - reg_start + 1;
+			std::cerr << "WARNING: scale mismatch, stopping read and removing potentially mismatched data." << std::endl;
+			coverage_data.erase(chr_name);
+			// this is so awkward to do in c++
+			// just a lot of boilerplate
+			data.chromosomes.erase(std::remove_if(data.chromosomes.begin(), data.chromosomes.end(), 
+				[chr_name] (const ChromosomeData& chr)
+				{
+					return chr.chr_template.name == chr_name;
+				}
+			), data.chromosomes.end());
 			break;
-			has_warned_scale_mismatch = true;
 		}
 	}
 

@@ -1,4 +1,4 @@
-let vis_data_path = "";
+let chunk_path = "chunks/";
 
 let base_bin_size = 100;
 let max_bin_size = 102400;
@@ -325,7 +325,19 @@ let views = [
 				label: "Coverage (Log2)",
 				data: [
 					{
-						key: "coverage_min",
+						key: "coverage_min_log2",
+						density_key: "coverage_density",
+						y_offset: 120,
+						y_scale: 30
+					},
+					{
+						key: "coverage_mean_log2",
+						density_key: "coverage_density",
+						y_offset: 120,
+						y_scale: 30
+					},
+					{
+						key: "coverage_max_log2",
 						density_key: "coverage_density",
 						y_offset: 120,
 						y_scale: 30
@@ -334,13 +346,8 @@ let views = [
 						key: "coverage_mean",
 						density_key: "coverage_density",
 						y_offset: 120,
-						y_scale: 30
-					},
-					{
-						key: "coverage_max",
-						density_key: "coverage_density",
-						y_offset: 120,
-						y_scale: 30
+						y_scale: 30,
+						func: value => Math.log2(value)
 					}
 				],
 				lines: [
@@ -458,7 +465,7 @@ function amplify_density_values(values, exponent) {
 let last_visible_chunks;
 
 
-function drawGraph(path, chunks, key, x_off, x_scale, y_off, y_scale, density_key) {
+function drawGraph(path, chunks, key, x_off, x_scale, y_off, y_scale, density_key, func) {
 	// ctx.beginPath();
 
 	let strokes = 0;
@@ -474,6 +481,8 @@ function drawGraph(path, chunks, key, x_off, x_scale, y_off, y_scale, density_ke
 			density_data = chunks[j].data[density_key];
 		for (let i = 0; i < data.length; ++i) {
 			let value = data[i];
+			if (func)
+				value = func(value);
 			if (density_data)
 				if (density_data[i] == 0) {
 					if (strokes == 1) {
@@ -556,7 +565,7 @@ function render(render_bin_size) {
 				ctx.setTransform(1, 0, 0, 1, 0, 0);
 				ctx.clearRect(0, 0, canvas.width, canvas.height);
 	
-				drawRectangles(ctx, chunks, data.keys, data.colors, 0, max_bin_size / chromosome_sizes[i] * canvas.width, 30, 20, data.amplification, data.density_key);
+				drawRectangles(ctx, chunks, data.keys, data.colors, canvas.width * (0.5 - 0.5 / initial_view_margin), max_bin_size / chromosome_sizes[i] * canvas.width / initial_view_margin, 30, 20, data.amplification, data.density_key);
 
 			}
 		}
@@ -654,7 +663,7 @@ function render(render_bin_size) {
 
 		for (let data of clip.data) {
 			if (data.key)
-				drawGraph(clip.path, visible_chunks, data.key, x_start, render_bin_size / screen_to_real, clip.height - data.y_offset, -data.y_scale, data.density_key);
+				drawGraph(clip.path, visible_chunks, data.key, x_start, render_bin_size / screen_to_real, clip.height - data.y_offset, -data.y_scale, data.density_key, data.func);
 			if (data.keys)
 				drawRectangles(ctx, visible_chunks, data.keys, data.colors, x_start, render_bin_size / screen_to_real, 0, canvas.height, data.amplification, data.density_key);
 		}
@@ -726,7 +735,7 @@ function get_chunk(chr, size, index) {
 
 function fetch_chunk(chr, size, index) {
 	let chunk_identifier = chr + "_" + size + "_" + index;
-	fetch(vis_data_path + chunk_identifier + ".cvd")
+	fetch(chunk_path + chunk_identifier + ".cvd")
 	.then(response => {
 		if (response.ok)
 			return response.arrayBuffer()
@@ -809,6 +818,7 @@ window.onload = function () {
 
 					let overlay = document.createElement("div");
 					overlay.classList.add("overlay");
+					overlay.innerText = chromosome_names[i];
 					a.appendChild(overlay);
 				}
 			}

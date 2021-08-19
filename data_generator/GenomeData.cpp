@@ -22,9 +22,10 @@ void GenomeData::save(const std::string& path, const std::string& template_path)
 	doc.data["chunk_size"] = std::to_string(2048);
 	std::vector<std::string> data_lines = {
 		"coverage_density",
+		"coverage_mean_log2",
+		"coverage_min_log2",
+		"coverage_max_log2",
 		"coverage_mean",
-		"coverage_min",
-		"coverage_max",
 		"baf_total_density",
 		"baf_top_density",
 		"baf_mid_density",
@@ -41,19 +42,19 @@ void GenomeData::save(const std::string& path, const std::string& template_path)
 		doc.data["data_lines[" + std::to_string(i) + "]"] = data_lines[i];
 	}
 
-	std::ofstream f(path + "index.html", std::ofstream::trunc);
-	doc.parse(f);
-	f.close();
+	{
+		std::ofstream f(path + "index.html", std::ofstream::trunc);
+		doc.parse(f);
+	}
 
 	{
 		std::ofstream f(path + "calls.json", std::ofstream::trunc);
-		Coal coal = getCallData();
-		coal.printJson(f);
+		getCallData().printJson(f);
 	}
 
 	std::vector<std::thread> threads;
 	for (auto& chr : chromosomes)
-		threads.emplace_back([chr, path]() { chr.save(path); });
+		threads.emplace_back([chr, path]() { chr.save(path + "chunks/"); });
 	for (auto& thread : threads)
 		thread.join();
 }

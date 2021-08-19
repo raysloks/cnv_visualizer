@@ -71,9 +71,10 @@ int ChromosomeData::save(const std::string& path) const
 				std::ofstream f(fp, std::ofstream::binary | std::ofstream::trunc);
 
 				dump_it(extract(shrunk_chr_data.log2_coverage_data, i, &CoverageData::density), f);
+				dump_it(extract(shrunk_chr_data.log2_coverage_data, i, &CoverageData::mean_log2), f);
+				dump_it(extract(shrunk_chr_data.log2_coverage_data, i, &CoverageData::min_log2), f);
+				dump_it(extract(shrunk_chr_data.log2_coverage_data, i, &CoverageData::max_log2), f);
 				dump_it(extract(shrunk_chr_data.log2_coverage_data, i, &CoverageData::mean), f);
-				dump_it(extract(shrunk_chr_data.log2_coverage_data, i, &CoverageData::min), f);
-				dump_it(extract(shrunk_chr_data.log2_coverage_data, i, &CoverageData::max), f);
 
 				dump_it(extract(shrunk_chr_data.baf_data, i, &BafData::total_density), f);
 				dump_it(extract(shrunk_chr_data.baf_data, i, &BafData::top_density), f);

@@ -2,6 +2,8 @@
 #include <fstream>
 #include <vector>
 
+#include <sys/stat.h>
+
 #include "ChromosomeTemplate.h"
 #include "ChromosomeData.h"
 #include "FakeDataGenerator.h"
@@ -220,6 +222,12 @@ int main(int argc, char ** argv)
 		path = path.substr(0, path.find_last_of('/'));
 		data.name = path.substr(path.find_last_of('/') + 1);
 		path += "/vis/";
+
+		std::cout << "creating directories..." << std::endl;
+		if (mkdir(path.c_str(), ALLPERMS) == -1)
+			std::cerr << "ERROR: failed to create a directory." << std::endl;
+		if (mkdir((path + "chunks/").c_str(), ALLPERMS) == -1)
+			std::cerr << "ERROR: failed to create a directory." << std::endl;
 
 		std::cout << "saving data..." << std::endl;
 		data.save(path, html_path);
