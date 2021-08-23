@@ -19,7 +19,15 @@ void GenomeData::save(const std::string& path, const std::string& template_path)
 		doc.data[chr_var + "size"] = std::to_string(chromosomes[i].log2_coverage_data.size() * chromosomes[i].scale);
 	}
 
+	int max_scale = 1000000;
+	int max_bin_size = chromosomes.front().scale;
+	while (max_bin_size * 2 < max_scale)
+		max_bin_size *= 2;
+
 	doc.data["chunk_size"] = std::to_string(2048);
+	doc.data["base_bin_size"] = std::to_string(chromosomes.front().scale);
+	doc.data["max_bin_size"] = std::to_string(max_bin_size);
+
 	std::vector<std::string> data_lines = {
 		"coverage_density",
 		"coverage_mean_log2",
@@ -54,7 +62,7 @@ void GenomeData::save(const std::string& path, const std::string& template_path)
 
 	std::vector<std::thread> threads;
 	for (auto& chr : chromosomes)
-		threads.emplace_back([chr, path]() { chr.save(path + "chunks/"); });
+		threads.emplace_back([=]() { chr.save(path + "chunks/", max_scale); });
 	for (auto& thread : threads)
 		thread.join();
 }

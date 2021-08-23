@@ -50,11 +50,9 @@ void dump_it(const std::vector<T>& input, std::ostream& os)
 	os.write((char*)input.data(), sizeof(T) * input.size());
 }
 
-int ChromosomeData::save(const std::string& path) const
+int ChromosomeData::save(const std::string& path, int max_scale) const
 {
 	//std::cout << "exporting chromosome " << chr_template.name << "..." << std::endl;
-
-	int max_scale = 200000;
 
 	ChromosomeData shrunk_chr_data = *this; // unnecessary copy, but it's kinda awkward to avoid it
 	int expected_scale = shrunk_chr_data.scale;

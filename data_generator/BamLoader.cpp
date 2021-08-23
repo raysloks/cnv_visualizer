@@ -29,7 +29,7 @@ int BamLoader::load(GenomeData& data, const std::string& fname)
 
 	while (sam_read1(fp, header, record) >= 0)
 	{
-		bool print_cigar_and_sequence = ++notify_counter % 100000 == 0;
+		bool print_cigar_and_sequence = ++notify_counter % 10000000 == 0;
 		if (print_cigar_and_sequence)
 			std::cout << record->core.tid << ":" << record->core.pos << std::endl;
 

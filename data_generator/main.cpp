@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <thread>
 
 #include <sys/stat.h>
 
@@ -170,7 +171,7 @@ int main(int argc, char ** argv)
 	{
 		for (auto& option : options)
 		{
-			std::cout << "-" << option.flag_short << "\t--" << option.flag_long << std::endl;
+			std::cout << "-" << option.flag_short << ", --" << option.flag_long << std::endl;
 			std::cout << "\t" << option.short_description << std::endl;
 		}
 		return 0;
@@ -201,22 +202,33 @@ int main(int argc, char ** argv)
 			vcf_loader.load(data.vcf, vcf_is);
 		}
 
+		std::vector<std::thread> threads;
+
 		if (bam_fname.size())
 		{
-			std::cout << "reading bam..." << std::endl;
-			BamLoader bam_loader;
-			bam_loader.load(data, bam_fname);
-			std::cout << "read bam." << std::endl;
+			threads.emplace_back([&]()
+			{
+				std::cout << "reading bam..." << std::endl;
+				BamLoader bam_loader;
+				bam_loader.load(data, bam_fname);
+				std::cout << "finished reading bam." << std::endl;
+			});
 		}
 
 		if (baf_calls.size())
 		{
-			std::cout << "filtering baf..." << std::endl;
-			std::ifstream baf_calls_is(baf_calls);
-			std::ifstream baf_filter_is(baf_filter);
-			vcf_loader.filterBafCalls(data, baf_filter_is, baf_calls_is);
-			std::cout << "filtered baf." << std::endl;
+			threads.emplace_back([&]()
+			{
+				std::cout << "filtering baf..." << std::endl;
+				std::ifstream baf_calls_is(baf_calls);
+				std::ifstream baf_filter_is(baf_filter);
+				vcf_loader.filterBafCalls(data, baf_filter_is, baf_calls_is);
+				std::cout << "filtered baf." << std::endl;
+			});
 		}
+
+		for (auto& thread : threads)
+			thread.join();
 
 		std::string path = tsv_path;
 		path = path.substr(0, path.find_last_of('/'));

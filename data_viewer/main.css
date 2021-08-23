@@ -40,7 +40,7 @@ h1 {
 	padding: 8px;
 	border: 1px solid black;
 	background-color: #264260;
-	z-index: 1;
+	z-index: 2;
 }
 
 .options_panel input {
@@ -66,8 +66,20 @@ canvas {
 	bottom: 0px;
 }
 
-.overview_link:hover .overlay {
-	background-color: #c4ecf38c;
+.overview_link:hover .overview_highlight_overlay {
+	background-color: #47b2c56b;
+}
+
+.overview_current .overview_highlight_overlay {
+	background-color: #1e99133f;
+}
+
+.overview_current:hover .overview_highlight_overlay {
+	background-color: #49ca9969;
+}
+
+.overview_zoom_overlay {
+	background-color: #504d8021;
 }
 
 .overview_link_border_left {
@@ -76,6 +88,27 @@ canvas {
 
 .overview_link_border_right {
 	border-right: 1px solid black;
+}
+
+.clip_resizer {
+	position: absolute;
+	bottom: -2px;
+	left: 0px;
+	right: 0px;
+	height: 4px;
+	cursor: ns-resize;
+	z-index: 1;
+	background-color: #2626266c;
+}
+
+.clip_grabber {
+	position: absolute;
+	right: 0px;
+	width: 30px;
+	top: 50%;
+	transform: translateY(-50%);
+	cursor: grab;
+	z-index: 1;
 }
 
 select {
@@ -124,7 +157,7 @@ select {
 	pointer-events: none;
 	flex-direction: column;
 	flex-wrap: wrap;
-	z-index: 2;
+	z-index: 3;
 }
 
 .dropdown_content a {
@@ -153,4 +186,8 @@ select {
 
 .canvas_cursor_pointer {
     cursor: pointer;
+}
+
+.grabbing {
+	cursor: grabbing;
 }

@@ -21,5 +21,5 @@ public:
 	std::vector<BaseData> base_data;
 
 	ChromosomeData shrink() const;
-	int save(const std::string& path) const;
+	int save(const std::string& path, int max_scale) const;
 };

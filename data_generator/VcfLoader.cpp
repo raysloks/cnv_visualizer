@@ -201,6 +201,7 @@ int VcfLoader::filterBafCalls(GenomeData& data, std::istream& is_filter, std::is
 
 	int64_t progress_notify = 0;
 	int64_t out_of_bounds_count = 0;
+	int64_t pos_count = 0;
 	int64_t ref_count = 0;
 	int64_t match_count = 0;
 	int64_t miss_count = 0;
@@ -216,7 +217,7 @@ int VcfLoader::filterBafCalls(GenomeData& data, std::istream& is_filter, std::is
 		}
 		else if (line[0] == '#')
 		{
-			std::cout << "hit header." << std::endl;
+			//std::cout << "hit header." << std::endl;
 		}
 		else
 		{
@@ -249,9 +250,10 @@ int VcfLoader::filterBafCalls(GenomeData& data, std::istream& is_filter, std::is
 				is_filter.read((char*)&filter_last_key, sizeof(filter_last_key));
 				is_filter.read((char*)&filter_last_freq, sizeof(filter_last_freq));
 
-				if (filter_last_key & 0b10000000)
+				if (filter_last_key & 0xff >= 128)
 				{
-					if (!current_filter_pos_has_call)
+					++pos_count;
+					if (current_filter_pos_has_call == false)
 					{
 						int32_t filter_pos = (filter_last_key >> 8) & 0xffffffff;
 						int pos = (filter_pos - chr_data->offset) / chr_data->scale;
@@ -265,7 +267,7 @@ int VcfLoader::filterBafCalls(GenomeData& data, std::istream& is_filter, std::is
 				}
 			}
 
-			if (++progress_notify > 1000)
+			if (++progress_notify > 100000)
 			{
 				progress_notify = 1;
 				int32_t filter_pos = (filter_last_key >> 8) & 0xffffffff;
@@ -275,6 +277,7 @@ int VcfLoader::filterBafCalls(GenomeData& data, std::istream& is_filter, std::is
 				std::cout << filter_pos << " " << record.pos << std::endl;
 				std::cout << filter_alt << " " << alt << std::endl;
 				std::cout << record.ref << std::endl;
+				std::cout << pos_count << std::endl;
 				std::cout << ref_count << std::endl;
 				std::cout << match_count << std::endl;
 				std::cout << miss_count << std::endl;
