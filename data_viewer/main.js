@@ -1,24 +1,16 @@
 let chunk_path = "chunks/";
 
-let base_bin_size = 100;
-let max_bin_size = 102400;
-let bin_sizes = [base_bin_size];
+let bin_sizes;
 
-while (bin_sizes[bin_sizes.length - 1] < max_bin_size) {
-	bin_sizes.push(bin_sizes[bin_sizes.length - 1] * 2);
-}
-
-let resolution_modifier = 1.95;
+let resolution_modifier = 2.0;
 let initial_view_margin = 1.2;
 let min_zoom_area_width = 5;
 
 let chr = {};
 
 let chromosome_index = null;
-let screen_to_real = max_bin_size;
+let screen_to_real = 1;
 let focus = 0;
-
-let current_bin_size = max_bin_size;
 
 let last_chromosome_index = null;
 let last_screen_to_real;
@@ -209,7 +201,8 @@ function check_update() {
 			if (current_chromosome_dropdown_a.href != hash)
 				current_chromosome_dropdown_a.href = hash;
 			// this is super scuffed
-			let current_chromosome_overview_a = views[1].clips[0].canvases[chromosome_index].parentNode;
+			let view = views.find(e => e.type == "overview");
+			let current_chromosome_overview_a = view.clips[0].canvases[chromosome_index].parentNode;
 			if (current_chromosome_overview_a.href != hash) {
 				current_chromosome_overview_a.href = hash;
 			}
@@ -226,7 +219,7 @@ function check_update() {
 			}
 			current_chromosome_overview_a.classList.add("overview_current");
 			if (last_chromosome_index !== chromosome_index && last_chromosome_index !== null) {
-				let last_chromosome_overview_a = views[1].clips[0].canvases[last_chromosome_index].parentNode;
+				let last_chromosome_overview_a = view.clips[0].canvases[last_chromosome_index].parentNode;
 				last_chromosome_overview_a.classList.remove("overview_current");
 			}
 		}
@@ -302,6 +295,40 @@ function on_animation_frame(timestamp) {
 // very temp initialization
 let views = [
 	{
+		type: "overview",
+		height: 80,
+		clips: [
+			{
+				height: 80,
+				label: "Overview",
+				data: [
+					{
+						keys: [
+							"base_a_density",
+							"base_c_density",
+							"base_g_density",
+							"base_t_density"
+						],
+						colors: [
+							[0.2, 0.0, 0.0],
+							[1.0, 1.0, 0.0],
+							[0.0, 1.0, 0.0],
+							[0.0, 0.0, 0.2],
+						],
+						labels: [
+							"A",
+							"C",
+							"G",
+							"T"
+						],
+						amplification: 5,
+						density_key: "base_total_density"
+					}
+				]
+			}
+		]
+	},
+	{
 		type: "chromosome",
 		height: 450,
 		clips: [
@@ -342,18 +369,19 @@ let views = [
 				},
 				data: [
 					{
-						key: "coverage_density"
+						key: "coverage_density",
+						fill: "rgba(10, 10, 200, 0.5)"
 					}
 				]
 			},
 			{
-				height: 200,
+				height: 150,
 				label: "Coverage (Log2)",
 				view: {
-					top_base: 1,
-					bot_base: -1,
-					top_scaling: 0.01,
-					bot_scaling: -0.01
+					top_base: 0.75,
+					bot_base: -1.25,
+					top_scaling: 0.0075,
+					bot_scaling: -0.0125
 				},
 				data: [
 					{
@@ -369,9 +397,12 @@ let views = [
 						density_key: "coverage_density"
 					},
 					{
-						key: "coverage_mean",
-						density_key: "coverage_density",
-						func: value => Math.log2(value)
+						key: "coverage_mean_log2_negative",
+						density_key: "coverage_density_negative"
+					},
+					{
+						key: "coverage_mean_log2_positive",
+						density_key: "coverage_density_positive"
 					}
 				],
 				lines: [
@@ -390,8 +421,8 @@ let views = [
 				},
 				data: [
 					{
-						key: "baf_mid_mean",
-						density_key: "baf_mid_density"
+						key: "baf_mean",
+						density_key: "baf_total_density"
 					}
 				]
 			},
@@ -404,20 +435,22 @@ let views = [
 				},
 				data: [
 					{
-						key: "baf_top_density"
+						key: "baf_top_density",
+						fill: "rgba(10, 200, 10, 0.5)"
 					}
 				]
 			},
 			{
 				height: 50,
-				label: "BAF Main Density",
+				label: "BAF Total Density",
 				view: {
 					top_base: 1.05,
 					bot_base: -0.05
 				},
 				data: [
 					{
-						key: "baf_mid_density"
+						key: "baf_total_density",
+						fill: "rgba(10, 200, 10, 0.5)"
 					}
 				]
 			},
@@ -430,41 +463,8 @@ let views = [
 				},
 				data: [
 					{
-						key: "baf_bot_density"
-					}
-				]
-			}
-		]
-	},
-	{
-		type: "overview",
-		height: 80,
-		clips: [
-			{
-				height: 80,
-				label: "Overview",
-				data: [
-					{
-						keys: [
-							"base_a_density",
-							"base_c_density",
-							"base_g_density",
-							"base_t_density"
-						],
-						colors: [
-							[0.2, 0.0, 0.0],
-							[1.0, 1.0, 0.0],
-							[0.0, 1.0, 0.0],
-							[0.0, 0.0, 0.2],
-						],
-						labels: [
-							"A",
-							"C",
-							"G",
-							"T"
-						],
-						amplification: 5,
-						density_key: "base_total_density"
+						key: "baf_bot_density",
+						fill: "rgba(10, 200, 10, 0.5)"
 					}
 				]
 			}
@@ -535,7 +535,7 @@ function drawGraph(path, chunks, key, x_off, x_scale, y_off, y_scale, density_ke
 		x_off += data.length * x_scale;
 	}
 
-	// ctx.stroke();
+	return x;
 }
 
 function drawRectangles(ctx, chunks, keys, colors, x_off, x_scale, y, height, amplification, density_key) {
@@ -564,7 +564,7 @@ function drawRectangles(ctx, chunks, keys, colors, x_off, x_scale, y, height, am
 			color = color.map(e => Math.floor(e * 255));
 			x = x_off + i * x_scale;
 			ctx.fillStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, 1.0)`;
-			ctx.fillRect(x, y, x_scale * 2.0, height);
+			ctx.fillRect(x, y, x_scale + 1, height);
 		}
 		x_off += data[0].length * x_scale;
 	}
@@ -573,7 +573,7 @@ function drawRectangles(ctx, chunks, keys, colors, x_off, x_scale, y, height, am
 function render(render_bin_size, repaint) {
 
 	{
-		let view = views[1];
+		let view = views.find(e => e.type == "overview");
 		let clip = view.clips[0];
 		for (let i = 0; i < clip.canvases.length; ++i) {
 			let canvas = clip.canvases[i];
@@ -606,15 +606,13 @@ function render(render_bin_size, repaint) {
 	if (render_bin_size === undefined) {
 		
 		let needed_bin_size = screen_to_real * resolution_modifier;
-		current_bin_size = base_bin_size;
+		render_bin_size = base_bin_size;
 		for (let i = 0; i < bin_sizes.length; ++i) {
 			if (bin_sizes[i] <= needed_bin_size)
-				current_bin_size = bin_sizes[i];
+				render_bin_size = bin_sizes[i];
 			else
 				break;
 		}
-
-		render_bin_size = current_bin_size;
 	}
 
 	let max_chunk_index = Math.floor(chr.size / (chunk_size * render_bin_size));
@@ -651,7 +649,7 @@ function render(render_bin_size, repaint) {
 
 	let x_start = (visible_chunks[0].offset - focus) / screen_to_real + document.body.clientWidth * 0.5;
 
-	let view = views[0];
+	let view = views.find(e => e.type == "chromosome");
 	for (const clip of view.clips) {
 
 		let canvas = clip.canvas;
@@ -711,16 +709,25 @@ function render(render_bin_size, repaint) {
 			}
 		}
 		
-		clip.path = new Path2D();
+		//clip.path = new Path2D();
 
 		for (let data of clip.data) {
-			if (data.key)
-				drawGraph(clip.path, visible_chunks, data.key, x_start, render_bin_size / screen_to_real, offset, scale, data.density_key, data.func);
+			if (data.key) {
+				data.path = new Path2D();
+				let x_end = drawGraph(data.path, visible_chunks, data.key, x_start, render_bin_size / screen_to_real, offset, scale, data.density_key, data.func);
+				ctx.stroke(data.path);
+				if (data.fill) {
+					ctx.fillStyle = data.fill;
+					data.path.lineTo(x_end, offset);
+					data.path.lineTo(x_start, offset);
+					ctx.fill(data.path);
+				}
+			}
 			if (data.keys)
 				drawRectangles(ctx, visible_chunks, data.keys, data.colors, x_start, render_bin_size / screen_to_real, 0, canvas.height, data.amplification, data.density_key);
 		}
 
-		ctx.stroke(clip.path);
+		//ctx.stroke(clip.path);
 
 		if (zoom_area_start) {
 			let zoom_area_screen_start = (zoom_area_start - focus) / screen_to_real + canvas.width * 0.5;
@@ -739,9 +746,9 @@ function render(render_bin_size, repaint) {
 function get_chunk(chr, size, index) {
 	let chunk_identifier = chr + "_" + size + "_" + index;
 	//console.log(chunk_identifier);
-	if (chunk_identifier in chunks)
+	if (chunk_identifier in chunks) {
 		return chunks[chunk_identifier];
-	else {
+	} else {
 		chunks[chunk_identifier] = null;
 		fetch_chunk(chr, size, index);
 		return null;
@@ -766,10 +773,13 @@ function fetch_chunk(chr, size, index) {
 
 		chunk.offset = chromosome_offsets[chromosome_names.findIndex(e => e == chr)] + size * index * chunk_size;
 		chunk.data = {};
+		chunk.scale = size;
+
+		let chunk_size_cutoff = (chromosome_sizes[chromosome_names.findIndex(e => e == chr)] - size * index * chunk_size) / size;
 
 		let offset = 0;
 		for (const data_line of chunk_data_lines) {
-			chunk.data[data_line] = new Float32Array(arrayBuffer, offset, chunk_size);
+			chunk.data[data_line] = new Float32Array(arrayBuffer, offset, Math.min(chunk_size, chunk_size_cutoff));
 			offset += chunk_size * 4;
 		}
 
@@ -798,6 +808,11 @@ window.onload = function () {
 	window.addEventListener("mouseup", on_mouse_up);
 	window.addEventListener("mousemove", on_mouse_move);
 
+	bin_sizes = [base_bin_size];
+	while (bin_sizes[bin_sizes.length - 1] < max_bin_size) {
+		bin_sizes.push(bin_sizes[bin_sizes.length - 1] * 2);
+	}
+
 	let views_element = document.getElementById("views");
 	for (let view of views) {
 		for (let clip of view.clips ?? []) {
@@ -811,76 +826,6 @@ window.onload = function () {
 				clip.canvas.classList.add("canvas_cursor_text");
 				clip.canvas.addEventListener("mousedown", on_mouse_down_canvas);
 				clip.wrapper.appendChild(clip.canvas);
-
-				clip.resizer = document.createElement("div");
-				clip.resizer.classList.add("clip_resizer");
-				clip.resizer.onmousedown = (ev) => {
-					clip.resizer.setPointerCapture(ev.pointerId);
-					clip.resizer.onmousemove = (e) => {
-						let height = Math.round(e.clientY - clip.canvas.getBoundingClientRect().top);
-						if (clip.canvas.height != height)
-							clip.canvas.height = height;
-					};
-					return false;
-				};
-				clip.resizer.onmouseup = (ev) => {
-					clip.resizer.releasePointerCapture(ev.pointerId);
-					clip.resizer.onmousemove = null;
-				};
-				clip.wrapper.appendChild(clip.resizer);
-
-				clip.grabber = document.createElement("img");
-				clip.grabber.src = "../../../../cnv_visualizer/data_viewer/handle.svg";
-				clip.grabber.classList.add("clip_grabber");
-				clip.grabber.onmousedown = (ev) => {
-					clip.grabber.style.cursor = "grabbing";
-					let grabber_rect = clip.grabber.getBoundingClientRect();
-					let grab_offset_y = (grabber_rect.top + grabber_rect.height * 0.5) - ev.clientY;
-					clip.grabber.setPointerCapture(ev.pointerId);
-					clip.grabber.onmousemove = (e) => {
-						let wrapper_rect = clip.wrapper.getBoundingClientRect();
-						let y_offset = wrapper_rect.height * 0.5;
-						let grabber_y = e.clientY + grab_offset_y;
-						let closest_diff = grabber_y - (wrapper_rect.top + y_offset);
-						let closest_index = null;
-						let parent = clip.wrapper.parentNode;
-						let wrappers = Array.from(parent.children);
-						for (let i = 0; i < wrappers.length; ++i) {
-							let rect = wrappers[i].getBoundingClientRect();
-							if (wrappers[i] === clip.wrapper) {
-								y_offset -= rect.height;
-								continue;
-							}
-							let y = rect.top + y_offset;
-							let diff = grabber_y - y;
-							if (Math.abs(diff) < Math.abs(closest_diff)) {
-								closest_diff = diff;
-								closest_index = i;
-							}
-						}
-						if (closest_index !== null) {
-							for (let i = 0; i < closest_index; ++i) {
-								if (wrappers[i] !== clip.wrapper)
-									parent.appendChild(wrappers[i]);
-							}
-							parent.appendChild(clip.wrapper);
-							for (let i = closest_index; i < wrappers.length; ++i) {
-								if (wrappers[i] !== clip.wrapper)
-									parent.appendChild(wrappers[i]);
-							}
-							clip.grabber.setPointerCapture(e.pointerId);
-						}
-						clip.grabber.style.transform = `translateY(calc(${closest_diff}px - 50%))`;
-					};
-					return false;
-				};
-				clip.grabber.onmouseup = (ev) => {
-					clip.grabber.style.cursor = "";
-					clip.grabber.style.transform = "";
-					clip.grabber.releasePointerCapture(ev.pointerId);
-					clip.grabber.onmousemove = null;
-				};
-				clip.wrapper.appendChild(clip.grabber);
 			}
 			if (view.type == "overview") {
 				clip.canvases = [];
@@ -914,6 +859,78 @@ window.onload = function () {
 					a.appendChild(zoom_overlay);
 				}
 			}
+
+			clip.resizer = document.createElement("div");
+			clip.resizer.classList.add("clip_resizer");
+			clip.resizer.onmousedown = (ev) => {
+				clip.resizer.setPointerCapture(ev.pointerId);
+				clip.resizer.onmousemove = (e) => {
+					let height = Math.round(e.clientY - clip.canvas.getBoundingClientRect().top);
+					if (clip.canvas.height != height)
+						clip.canvas.height = height;
+				};
+				return false;
+			};
+			clip.resizer.onmouseup = (ev) => {
+				clip.resizer.releasePointerCapture(ev.pointerId);
+				clip.resizer.onmousemove = null;
+			};
+			clip.wrapper.appendChild(clip.resizer);
+
+			clip.grabber = document.createElement("img");
+			clip.grabber.src = "../../../../cnv_visualizer/data_viewer/handle.svg";
+			clip.grabber.classList.add("clip_grabber");
+			clip.grabber.onmousedown = (ev) => {
+				clip.grabber.style.cursor = "grabbing";
+				let grabber_rect = clip.grabber.getBoundingClientRect();
+				let grab_offset_y = (grabber_rect.top + grabber_rect.height * 0.5) - ev.clientY;
+				clip.grabber.setPointerCapture(ev.pointerId);
+				clip.grabber.onmousemove = (e) => {
+					let wrapper_rect = clip.wrapper.getBoundingClientRect();
+					let y_offset = wrapper_rect.height * 0.5;
+					let grabber_y = e.clientY + grab_offset_y;
+
+					let parent = clip.wrapper.parentNode;
+					let wrappers = Array.from(parent.children);
+
+					let closest_diff = grabber_y - (wrappers[wrappers.length - 1].getBoundingClientRect().bottom + y_offset - wrapper_rect.height);
+					let closest_index = wrappers.length;
+
+					for (let i = 0; i < wrappers.length; ++i) {
+						let rect = wrappers[i].getBoundingClientRect();
+						let y = rect.top + y_offset;
+						let diff = grabber_y - y;
+						if (Math.abs(diff) < Math.abs(closest_diff)) {
+							closest_diff = diff;
+							closest_index = i;
+						}
+						if (wrappers[i] === clip.wrapper) {
+							y_offset -= rect.height;
+						}
+					}
+					if (wrappers[closest_index] !== clip.wrapper) {
+						for (let i = 0; i < closest_index; ++i) {
+							if (wrappers[i] !== clip.wrapper)
+								parent.appendChild(wrappers[i]);
+						}
+						parent.appendChild(clip.wrapper);
+						for (let i = closest_index; i < wrappers.length; ++i) {
+							if (wrappers[i] !== clip.wrapper)
+								parent.appendChild(wrappers[i]);
+						}
+						clip.grabber.setPointerCapture(e.pointerId);
+					}
+					clip.grabber.style.transform = `translateY(calc(${closest_diff}px - 50%))`;
+				};
+				return false;
+			};
+			clip.grabber.onmouseup = (ev) => {
+				clip.grabber.style.cursor = "";
+				clip.grabber.style.transform = "";
+				clip.grabber.releasePointerCapture(ev.pointerId);
+				clip.grabber.onmousemove = null;
+			};
+			clip.wrapper.appendChild(clip.grabber);
 			
 			let overlay = document.createElement("div");
 			overlay.className = "clip_overlay";

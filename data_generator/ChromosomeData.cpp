@@ -52,7 +52,7 @@ void dump_it(const std::vector<T>& input, std::ostream& os)
 
 int ChromosomeData::save(const std::string& path, int max_scale) const
 {
-	//std::cout << "exporting chromosome " << chr_template.name << "..." << std::endl;
+	// std::cout << "exporting chromosome " << chr_template.name << "..." << std::endl;
 
 	ChromosomeData shrunk_chr_data = *this; // unnecessary copy, but it's kinda awkward to avoid it
 	int expected_scale = shrunk_chr_data.scale;
@@ -68,17 +68,19 @@ int ChromosomeData::save(const std::string& path, int max_scale) const
 				// std::cout << fp << std::endl;
 				std::ofstream f(fp, std::ofstream::binary | std::ofstream::trunc);
 
+				dump_it(extract(shrunk_chr_data.log2_coverage_data, i, &CoverageData::density_negative), f);
+				dump_it(extract(shrunk_chr_data.log2_coverage_data, i, &CoverageData::mean_log2_negative), f);
+				dump_it(extract(shrunk_chr_data.log2_coverage_data, i, &CoverageData::density_positive), f);
+				dump_it(extract(shrunk_chr_data.log2_coverage_data, i, &CoverageData::mean_log2_positive), f);
 				dump_it(extract(shrunk_chr_data.log2_coverage_data, i, &CoverageData::density), f);
 				dump_it(extract(shrunk_chr_data.log2_coverage_data, i, &CoverageData::mean_log2), f);
 				dump_it(extract(shrunk_chr_data.log2_coverage_data, i, &CoverageData::min_log2), f);
 				dump_it(extract(shrunk_chr_data.log2_coverage_data, i, &CoverageData::max_log2), f);
-				dump_it(extract(shrunk_chr_data.log2_coverage_data, i, &CoverageData::mean), f);
 
 				dump_it(extract(shrunk_chr_data.baf_data, i, &BafData::total_density), f);
 				dump_it(extract(shrunk_chr_data.baf_data, i, &BafData::top_density), f);
-				dump_it(extract(shrunk_chr_data.baf_data, i, &BafData::mid_density), f);
 				dump_it(extract(shrunk_chr_data.baf_data, i, &BafData::bot_density), f);
-				dump_it(extract(shrunk_chr_data.baf_data, i, &BafData::mid_mean), f);
+				dump_it(extract(shrunk_chr_data.baf_data, i, &BafData::mean), f);
 
 				dump_it(extract(shrunk_chr_data.base_data, i, &BaseData::total_density), f);
 				dump_it(extract(shrunk_chr_data.base_data, i, &BaseData::a_density), f);
