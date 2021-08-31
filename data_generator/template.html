@@ -7,27 +7,29 @@
 		<meta name='viewport' content='width=device-width, initial-scale=1'>
 		<link rel='stylesheet' type='text/css' media='screen' href='../../../../cnv_visualizer/data_viewer/main.css'>
 		<script src='../../../../cnv_visualizer/data_viewer/main.js'></script>
+		<script src='../../../../cnv_visualizer/data_viewer/render.js'></script>
+		<script src='../../../../cnv_visualizer/data_viewer/chunk.js'></script>
 	</head>
 	<body>
+		<script>
+			let chromosome_names = [];
+			let chromosome_offsets = [];
+			let chromosome_sizes = [];
+			%% for chr in chromosomes
+			chromosome_names.push("%% chr.name %%");
+			chromosome_offsets.push(%% chr.offset %%);
+			chromosome_sizes.push(%% chr.size %%);
+			%% end
+			let chunk_size = %% chunk_size %%;
+			let base_bin_size = %% base_bin_size %%;
+			let max_bin_size = %% max_bin_size %%;
+			let chunk_data_lines = [];
+			%% for data_line in data_lines
+			chunk_data_lines.push("%% data_line %%");
+			%% end
+		</script>
 		<div id="top_bar">
 			<h1>%% title %%</h1>
-			<script>
-				let chromosome_names = [];
-				let chromosome_offsets = [];
-				let chromosome_sizes = [];
-				%% for chr in chromosomes
-				chromosome_names.push("%% chr.name %%");
-				chromosome_offsets.push(%% chr.offset %%);
-				chromosome_sizes.push(%% chr.size %%);
-				%% end
-				let chunk_size = %% chunk_size %%;
-				let base_bin_size = %% base_bin_size %%;
-				let max_bin_size = %% max_bin_size %%;
-				let chunk_data_lines = [];
-				%% for data_line in data_lines
-				chunk_data_lines.push("%% data_line %%");
-				%% end
-			</script>
 			<select id="chromosome_dropdown_select">
 				%% for chr in chromosomes
 				<option>%% chr.name %%</option>

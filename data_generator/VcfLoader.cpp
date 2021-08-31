@@ -107,9 +107,12 @@ int VcfLoader::createBafFilter(std::istream& is, std::ostream& os)
 				if (last_ref != 0)
 				{
 					++pos_count;
+
+					// this may be incorrect
 					float pos_ref_freq = 1.0f;
 					for (size_t i = 0; i < 4; ++i)
 						pos_ref_freq -= last_freqs[i];
+
 					//last_freqs[base_to_index[last_ref]] = pos_ref_freq;
 					for (size_t i = 0; i < 4; ++i)
 					{
