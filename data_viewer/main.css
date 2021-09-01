@@ -142,6 +142,14 @@ select {
 	border-bottom: 2px solid black;
 }
 
+.context_menu {
+	position: absolute;
+	background-color: white;
+	border: 2px solid black;
+	min-width: 100px;
+	min-height: 100px;
+}
+
 .dropdown {
 	display: inline-block;
 	margin: 0px;

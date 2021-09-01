@@ -29,15 +29,6 @@ let keys_down = {};
 
 function key_down_handler(e) {
 	keys_down[e.key] = true;
-
-	if (e.key == "q")
-		chromosome_index -= 1;
-	if (e.key == "e")
-		chromosome_index += 1;
-	if (chromosome_index < 0)
-		chromosome_index = 0;
-	if (chromosome_index >= chromosome_names.length)
-		chromosome_index = chromosome_names.length - 1;
 }
 
 function key_up_handler(e) {
@@ -76,7 +67,6 @@ function perform_zoom(start, end, smooth) {
 
 	smooth = smooth ?? use_smooth_zoom;
 
-	// if (zoom_area_width / screen_to_real >= 1)
 	smooth_zoom_target_focus = zoom_area_midpoint;
 	smooth_zoom_target_screen_to_real = zoom_area_width / document.body.clientWidth;
 	if (smooth) {
@@ -144,7 +134,6 @@ function check_update() {
 		|| last_zoom_area_end != zoom_area_end) {
 
 		if (last_chromosome_index != chromosome_index) {
-			document.getElementById("chromosome_dropdown_select").selectedIndex = chromosome_index;
 			let chromosome_dropdown_current = document.getElementById("chromosome_dropdown_current");
 			chromosome_dropdown_current.innerHTML = chromosome_names[chromosome_index];
 			chromosome_dropdown_current.href = "#" + chromosome_names[chromosome_index];
@@ -230,15 +219,6 @@ function on_animation_frame(timestamp) {
 		elapsed = (timestamp - last_timestamp) * 0.001;
 	elapsed = Math.min(0.33, elapsed);
 	last_timestamp = timestamp;
-
-	// if (keys_down["w"])
-	// 	screen_to_real *= Math.exp(Math.log(0.5) * elapsed);
-	// if (keys_down["a"])
-	// 	focus -= 400 * screen_to_real * elapsed;
-	// if (keys_down["s"])
-	// 	screen_to_real *= Math.exp(Math.log(2.0) * elapsed);
-	// if (keys_down["d"])
-	// 	focus += 400 * screen_to_real * elapsed;
 
 	if (use_smooth_zoom) {
 		tick_smooth_zoom(elapsed);
@@ -473,11 +453,31 @@ function hex_to_rgb(color) {
 	];
 }
 
+function is_parent_recursive(child, parent) {
+	while (child) {
+		if (child === parent)
+			return true;
+		child = child.parentNode;
+	}
+	return false;
+}
+
 window.onload = function () {
 	bin_sizes = [base_bin_size];
 	while (bin_sizes[bin_sizes.length - 1] < max_bin_size) {
 		bin_sizes.push(bin_sizes[bin_sizes.length - 1] * 2);
 	}
+
+	let context_menu_element = document.createElement("div");
+	context_menu_element.classList.add("context_menu");
+	context_menu_element.style.display = "none";
+	document.body.appendChild(context_menu_element);
+
+	document.addEventListener("mousedown", (ev) => {
+		if (is_parent_recursive(ev.target, context_menu_element) == false) {
+			context_menu_element.style.display = "none";
+		}
+	});
 
 	let views_element = document.getElementById("views");
 	for (let view of views) {
@@ -491,6 +491,28 @@ window.onload = function () {
 				clip.canvas.height = clip.height;
 				clip.canvas.classList.add("canvas_cursor_text");
 				clip.wrapper.appendChild(clip.canvas);
+
+				clip.canvas.oncontextmenu = (ev) => {
+					let pos = (ev.clientX - document.body.clientWidth * 0.5) * screen_to_real + focus;
+					if (calls) {
+						let call_chr = calls.chromosomes[chr.name];
+						if (call_chr) {
+							let filtered_calls = call_chr.records.filter(e => e.pos <= pos && e.info["END"] >= pos);
+							if (filtered_calls.length > 0) {
+								context_menu_element.style.display = "";
+								context_menu_element.style.left = ev.clientX + "px";
+								context_menu_element.style.top = ev.clientY + "px";
+								context_menu_element.innerHTML = "";
+								for (let call of filtered_calls) {
+									let p = document.createElement("p");
+									p.innerText = call.id;
+									context_menu_element.appendChild(p);
+								}
+								return false;
+							}
+						}
+					}
+				};
 
 				clip.canvas.onmousedown = (ev) => {
 					if (ev.which == 1) {
@@ -723,10 +745,6 @@ window.onload = function () {
 		}
 	}
 
-	let chromosome_select = document.getElementById("chromosome_dropdown_select");
-	chromosome_select.onchange = function () {
-		chromosome_index = chromosome_select.selectedIndex;
-	};
 	hash_change_handler();
 
 	fetch("calls.json")
