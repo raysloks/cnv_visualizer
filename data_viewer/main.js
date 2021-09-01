@@ -207,14 +207,18 @@ function tick_smooth_zoom(elapsed) {
 			focus = smooth_zoom_target_focus;
 			screen_to_real = smooth_zoom_target_screen_to_real;
 		} else {
-			let og_rel = Math.exp(Math.log(smooth_zoom_target_screen_to_real / screen_to_real) / (1.0 - last_linear_t));
-			og_rel = Math.max(1.0 / 20000.0, og_rel);
-			let log_t = (1.0 - Math.exp(Math.log(og_rel) * linear_t)) / (1.0 - og_rel);
-			let last_log_t = (1.0 - Math.exp(Math.log(og_rel) * last_linear_t)) / (1.0 - og_rel);
-			let relative_log_t = (log_t - last_log_t) / (1.0 - last_log_t);
-
-			focus = focus * (1.0 - relative_log_t) + smooth_zoom_target_focus * relative_log_t;
-			screen_to_real *= Math.exp(Math.log(smooth_zoom_target_screen_to_real / screen_to_real) * relative_linear_t);
+			if (screen_to_real != smooth_zoom_target_screen_to_real) {
+				let og_rel = Math.exp(Math.log(smooth_zoom_target_screen_to_real / screen_to_real) / (1.0 - last_linear_t));
+				og_rel = Math.max(1.0 / 20000.0, og_rel);
+				let log_t = (1.0 - Math.exp(Math.log(og_rel) * linear_t)) / (1.0 - og_rel);
+				let last_log_t = (1.0 - Math.exp(Math.log(og_rel) * last_linear_t)) / (1.0 - og_rel);
+				let relative_log_t = (log_t - last_log_t) / (1.0 - last_log_t);
+	
+				focus = focus * (1.0 - relative_log_t) + smooth_zoom_target_focus * relative_log_t;
+				screen_to_real *= Math.exp(Math.log(smooth_zoom_target_screen_to_real / screen_to_real) * relative_linear_t);
+			} else {
+				focus = focus * (1.0 - relative_linear_t) + smooth_zoom_target_focus * relative_linear_t;
+			}
 		}
 	}
 }
