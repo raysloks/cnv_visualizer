@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH -A sens2020586
+#SBATCH -A sens2017106
 #SBATCH -p core
 #SBATCH -n 1
 #SBATCH -t 3:00:00

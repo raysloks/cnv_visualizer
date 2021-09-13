@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH -A sens2020586
+#SBATCH -A sens2017106
 #SBATCH -p core
 #SBATCH -n 2
 #SBATCH -t 1-00:00:00
@@ -10,4 +10,4 @@
 
 mkdir "${BASH_REMATCH[1]}/vis"
 
-./cnv_visualizer/data_generator/bin/data_generator $1 $2 $3 -s $4
+./${BASH_SOURCE%/*/*}/data_generator/bin/data_generator $1 $2 $3 -s $4

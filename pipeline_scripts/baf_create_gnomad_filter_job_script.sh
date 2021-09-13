@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH -A sens2020586
+#SBATCH -A sens2017106
 #SBATCH -p core
 #SBATCH -n 2
 #SBATCH -t 10-00:00:00
@@ -9,4 +9,4 @@
 module load bioinfo-tools
 module load samtools
 
-bgzip -c -d $1 | ./cnv_visualizer/data_generator/bin/data_generator -f $2 $3 $4
+bgzip -cd $1 | ./${BASH_SOURCE%/*/*}/data_generator/bin/data_generator -f $2 $3 $4
