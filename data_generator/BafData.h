@@ -8,10 +8,11 @@ public:
 	BafData();
 	BafData(float baf);
 
-	float total_density;
-	float top_density;
-	float bot_density;
+	float density;
 	float mean;
+	float min;
+	float max;
+	float under;
 
 	BafData combine(const BafData& rhs) const;
 	

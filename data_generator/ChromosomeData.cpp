@@ -77,10 +77,11 @@ int ChromosomeData::save(const std::string& path, int max_scale) const
 				dump_it(extract(shrunk_chr_data.log2_coverage_data, i, &CoverageData::min_log2), f);
 				dump_it(extract(shrunk_chr_data.log2_coverage_data, i, &CoverageData::max_log2), f);
 
-				dump_it(extract(shrunk_chr_data.baf_data, i, &BafData::total_density), f);
-				dump_it(extract(shrunk_chr_data.baf_data, i, &BafData::top_density), f);
-				dump_it(extract(shrunk_chr_data.baf_data, i, &BafData::bot_density), f);
+				dump_it(extract(shrunk_chr_data.baf_data, i, &BafData::density), f);
 				dump_it(extract(shrunk_chr_data.baf_data, i, &BafData::mean), f);
+				dump_it(extract(shrunk_chr_data.baf_data, i, &BafData::min), f);
+				dump_it(extract(shrunk_chr_data.baf_data, i, &BafData::max), f);
+				dump_it(extract(shrunk_chr_data.baf_data, i, &BafData::under), f);
 
 				dump_it(extract(shrunk_chr_data.base_data, i, &BaseData::total_density), f);
 				dump_it(extract(shrunk_chr_data.base_data, i, &BaseData::a_density), f);

@@ -84,6 +84,8 @@ int main(int argc, char ** argv)
 
 	std::string bam_fname;
 
+	bool test = false;
+
 	std::vector<CmdOption> options = {
 		CmdOption('h', "help", "Show this text.", 
 			"long help desc", "help help and help example", std::vector<CmdValue>({ CmdValue(&help)})),
@@ -92,7 +94,9 @@ int main(int argc, char ** argv)
 		CmdOption('b', "baf", "Add BAF data to final output using a genomic .vcf calls file and a .baf filter file created with '-f' or '--filter-create'.", 
 			"long desc", "help and example", std::vector<CmdValue>({ CmdValue(&baf_calls, true), CmdValue(&baf_filter, true) })),
 		CmdOption('s', "staining", "Add nucleotide base frequency data to final output using a .bam file.", 
-			"long desc", "help and example", std::vector<CmdValue>({ CmdValue(&bam_fname, true) }))
+			"long desc", "help and example", std::vector<CmdValue>({ CmdValue(&bam_fname, true) })),
+		CmdOption('t', "test", "Generate fake testing data.", 
+			"long desc", "help and example", std::vector<CmdValue>({ CmdValue(&test) }))
 	};
 
 	std::string tsv_path, html_path;
@@ -186,13 +190,16 @@ int main(int argc, char ** argv)
 		vcf_loader.createBafFilter(std::cin, vcf_os);
 	}
 
-	if (tsv_path.size())
+	if (tsv_path.size() || test)
 	{
 		GenomeData data;
 
-		CoverageDataLoader cov_loader(100);
-		std::ifstream tsv_is(tsv_path);
-		cov_loader.load(data, tsv_is);
+		if (tsv_path.size())
+		{
+			CoverageDataLoader cov_loader(100);
+			std::ifstream tsv_is(tsv_path);
+			cov_loader.load(data, tsv_is);
+		}
 
 		VcfLoader vcf_loader;
 

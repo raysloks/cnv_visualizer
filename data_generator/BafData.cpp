@@ -5,48 +5,48 @@ const float epsilon_bot = 0.1f;
 
 BafData::BafData()
 {
-	total_density = 0.0f;
-	top_density = 0.0f;
-	bot_density = 0.0f;
+	density = 0.0f;
 	mean = 0.0f;
+	min = 1.0f;
+	max = 0.0f;
+	under = 0.0f;
 }
 
 BafData::BafData(float baf)
 {
-	total_density = 1.0f;
-	top_density = 0.0f;
-	bot_density = 0.0f;
+	density = 1.0f;
 	mean = baf;
-	if (baf > 1.0f - epsilon_top)
-		top_density = 1.0f;
-	else if (baf < epsilon_bot)
-		bot_density = 1.0f;
+	min = baf;
+	max = baf;
+	under = baf;
 }
 
 BafData BafData::combine(const BafData& rhs) const
 {
 	BafData result;
 
-	result.total_density = (total_density + rhs.total_density) / 2.0f;
-	result.top_density = (top_density + rhs.top_density) / 2.0f;
-	result.bot_density = (bot_density + rhs.bot_density) / 2.0f;
-	if (total_density + rhs.total_density > 0.0f)
-		result.mean = (mean * total_density + rhs.mean * rhs.total_density) / (total_density + rhs.total_density);
+	result.density = (density + rhs.density) / 2.0f;
+	if (density + rhs.density > 0.0f)
+		result.mean = (mean * density + rhs.mean * rhs.density) / (density + rhs.density);
 	else
 		result.mean = 0.0f;
+	result.min = fminf(min, rhs.min);
+	result.max = fmaxf(max, rhs.max);
+	result.under = density != 0.0f ? under : rhs.under;
 
 	return result;
 }
 
 BafData& BafData::operator+=(const BafData& rhs)
 {
-	mean = mean * total_density + rhs.mean * rhs.total_density;
-	total_density += rhs.total_density;
-	if (total_density > 0.0f)
-		mean /= total_density;
+	result.under = density != 0.0f ? under : rhs.under;
 
-	top_density += rhs.top_density;
-	bot_density += rhs.bot_density;
+	mean = mean * density + rhs.mean * rhs.density;
+	density += rhs.density;
+	if (density > 0.0f)
+		mean /= density;
+	result.min = fminf(min, rhs.min);
+	result.max = fmaxf(max, rhs.max);
 	
 	return *this;
 }

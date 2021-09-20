@@ -20,8 +20,7 @@ ChromosomeData FakeDataGenerator::generateFakeChromosomeData(const ChromosomeTem
 
 	chr_data.scale = scale;
 
-	//chr_data.baf_offset = start_offset;
-	//chr_data.log2_coverage_offset = start_offset;
+	chr_data.offset = start_offset;
 
 	chr_data.baf_data.resize(size);
 	chr_data.log2_coverage_data.resize(size);
