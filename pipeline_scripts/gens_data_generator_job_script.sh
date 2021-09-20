@@ -9,4 +9,4 @@
 module load bioinfo-tools
 module load tabix
 
-./$5/utils/generate_gens_data.pl $1 $2 $3 $4
+perl "$5/utils/generate_gens_data.pl" $1 $2 $3 $4
