@@ -192,7 +192,7 @@ int VcfLoader::filterBafCalls(GenomeData& data, std::istream& is_filter, std::is
 		chr.baf_data.resize(chr.log2_coverage_data.size());
 	}
 
-	ChromosomeData * chr_data;
+	ChromosomeData * chr_data = nullptr;
 
 	int64_t filter_last_key = 0;
 	float filter_last_freq = 0.0f;
