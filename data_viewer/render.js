@@ -157,7 +157,7 @@ function getVisibleChunks(minimum_bin_size, left, right) {
 	if (visible_chunks.some(e => e === null)) {
 		if (bin_size < max_bin_size)
 			return getVisibleChunks(bin_size * 2, left, right);
-		return null;
+		return [null, null];
 	}
 
 	return [visible_chunks, bin_size];
@@ -261,106 +261,108 @@ function render(render_bin_size, repaint) {
 	let [visible_chunks, bin_size] = getVisibleChunks(screen_to_real * resolution_modifier, focus - half_size, focus + half_size);
 
 	let view = views.find(e => e.type == "chromosome");
-	for (const clip of view.clips) {
-
-		let x_start = (visible_chunks[0].offset - focus) / screen_to_real + document.body.clientWidth * 0.5;
-
-		let canvas = clip.canvas;
-
-		let repaint_clip = repaint;
-
-		if (canvas.width != document.body.clientWidth) {
-			canvas.width = document.body.clientWidth;
-			repaint_clip = true;
-		}
-
-		if (clip.height != canvas.height) {
-			clip.height = canvas.height;
-			repaint_clip = true;
-		}
-
-		if (clip.render_out_of_date) {
-			clip.render_out_of_date = false;
-			repaint_clip = true;
-		}
-
-		if (repaint_clip === false) {
-			continue;
-		}
-
-		let ctx = canvas.getContext("2d");
-
-		ctx.setTransform(1, 0, 0, 1, 0, 0);
-		ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-		if (calls) {
-			if (chr.name in calls.chromosomes) {
-				for (const record of calls.chromosomes[chr.name].records) {
-					let screen_pos = (record.pos - focus) / screen_to_real + canvas.width * 0.5;
-					let screen_end = (record.info["END"] - focus) / screen_to_real + canvas.width * 0.5;
-					if (record.alt == "<DEL>")
-						ctx.fillStyle = "rgba(200, 10, 10, 0.25)";
-					if (record.alt == "<DUP>")
-						ctx.fillStyle = "rgba(10, 200, 10, 0.25)";
-					ctx.fillRect(screen_pos, 0, screen_end - screen_pos, canvas.height);
-				}
+	if (visible_chunks) {
+		for (const clip of view.clips) {
+	
+			let x_start = (visible_chunks[0].offset - focus) / screen_to_real + document.body.clientWidth * 0.5;
+	
+			let canvas = clip.canvas;
+	
+			let repaint_clip = repaint;
+	
+			if (canvas.width != document.body.clientWidth) {
+				canvas.width = document.body.clientWidth;
+				repaint_clip = true;
 			}
-		}
-
-		let top = (clip.view?.top_base ?? clip.height) + (clip.view?.top_scaling ?? 0) * clip.height;
-		let bot = (clip.view?.bot_base ?? 0) + (clip.view?.bot_scaling ?? 0) * clip.height;
-
-		let scale = canvas.height / (bot - top);
-		let offset = -top * scale;
-
-		if (clip.lines) {
-			for (const line of clip.lines) {
-				ctx.save();
-				if (line.style)
-					ctx.strokeStyle = line.style;
-				ctx.beginPath();
-				let y = line.y * scale + offset;
-				ctx.moveTo(0, y);
-				ctx.lineTo(canvas.width, y);
-				ctx.stroke();
-				ctx.restore();
+	
+			if (clip.height != canvas.height) {
+				clip.height = canvas.height;
+				repaint_clip = true;
 			}
-		}
-
-		for (let data of clip.data) {
-			if (data.key) {
-				if (data.point_mod) {
-					let [visible_chunks, bin_size] = getVisibleChunks(screen_to_real * resolution_modifier * data.point_mod, focus - half_size, focus + half_size);
-					let x_start = (visible_chunks[0].offset - focus) / screen_to_real + document.body.clientWidth * 0.5;
-					data.path = new Path2D();
-					drawPointGraph(data.path, visible_chunks, data.key, x_start, bin_size / screen_to_real, offset, scale, data.density_key, data.func);
-					ctx.stroke(data.path);
-				} else {
-					data.path = new Path2D();
-					let x_end = drawGraph(data.path, visible_chunks, data.key, x_start, bin_size / screen_to_real, offset, scale, data.density_key, data.func);
-					ctx.stroke(data.path);
-					if (data.fill) {
-						ctx.fillStyle = data.fill;
-						data.path.lineTo(x_end, offset);
-						data.path.lineTo(x_start, offset);
-						ctx.fill(data.path);
+	
+			if (clip.render_out_of_date) {
+				clip.render_out_of_date = false;
+				repaint_clip = true;
+			}
+	
+			if (repaint_clip === false) {
+				continue;
+			}
+	
+			let ctx = canvas.getContext("2d");
+	
+			ctx.setTransform(1, 0, 0, 1, 0, 0);
+			ctx.clearRect(0, 0, canvas.width, canvas.height);
+	
+			if (calls) {
+				if (chr.name in calls.chromosomes) {
+					for (const record of calls.chromosomes[chr.name].records) {
+						let screen_pos = (record.pos - focus) / screen_to_real + canvas.width * 0.5;
+						let screen_end = (record.info["END"] - focus) / screen_to_real + canvas.width * 0.5;
+						if (record.alt == "<DEL>")
+							ctx.fillStyle = "rgba(200, 10, 10, 0.25)";
+						if (record.alt == "<DUP>")
+							ctx.fillStyle = "rgba(10, 200, 10, 0.25)";
+						ctx.fillRect(screen_pos, 0, screen_end - screen_pos, canvas.height);
 					}
 				}
 			}
-			if (data.keys)
-				drawRectangles(ctx, visible_chunks, data.keys, data.colors, x_start, bin_size / screen_to_real, 0, canvas.height, data.amplification, data.density_key);
-		}
-
-		if (zoom_area_start) {
-			let zoom_area_screen_start = (zoom_area_start - focus) / screen_to_real + canvas.width * 0.5;
-			let zoom_area_screen_end = view_mouse_x;
-			let zoom_area_screen_left = Math.min(zoom_area_screen_start, zoom_area_screen_end);
-			let zoom_area_screen_right = Math.max(zoom_area_screen_start, zoom_area_screen_end);
-			let zoom_area_screen_width = zoom_area_screen_right - zoom_area_screen_left;
-			ctx.fillStyle = "rgba(100, 100, 240, 0.5)";
-			if (zoom_area_screen_width < min_zoom_area_width)
-				ctx.fillStyle = "rgba(100, 100, 240, 0.25)";
-			ctx.fillRect(zoom_area_screen_left, 0, zoom_area_screen_width, canvas.height);
+	
+			let top = (clip.view?.top_base ?? clip.height) + (clip.view?.top_scaling ?? 0) * clip.height;
+			let bot = (clip.view?.bot_base ?? 0) + (clip.view?.bot_scaling ?? 0) * clip.height;
+	
+			let scale = canvas.height / (bot - top);
+			let offset = -top * scale;
+	
+			if (clip.lines) {
+				for (const line of clip.lines) {
+					ctx.save();
+					if (line.style)
+						ctx.strokeStyle = line.style;
+					ctx.beginPath();
+					let y = line.y * scale + offset;
+					ctx.moveTo(0, y);
+					ctx.lineTo(canvas.width, y);
+					ctx.stroke();
+					ctx.restore();
+				}
+			}
+	
+			for (let data of clip.data) {
+				if (data.key) {
+					if (data.point_mod) {
+						let [visible_chunks, bin_size] = getVisibleChunks(screen_to_real * resolution_modifier * data.point_mod, focus - half_size, focus + half_size);
+						let x_start = (visible_chunks[0].offset - focus) / screen_to_real + document.body.clientWidth * 0.5;
+						data.path = new Path2D();
+						drawPointGraph(data.path, visible_chunks, data.key, x_start, bin_size / screen_to_real, offset, scale, data.density_key, data.func);
+						ctx.stroke(data.path);
+					} else {
+						data.path = new Path2D();
+						let x_end = drawGraph(data.path, visible_chunks, data.key, x_start, bin_size / screen_to_real, offset, scale, data.density_key, data.func);
+						ctx.stroke(data.path);
+						if (data.fill) {
+							ctx.fillStyle = data.fill;
+							data.path.lineTo(x_end, offset);
+							data.path.lineTo(x_start, offset);
+							ctx.fill(data.path);
+						}
+					}
+				}
+				if (data.keys)
+					drawRectangles(ctx, visible_chunks, data.keys, data.colors, x_start, bin_size / screen_to_real, 0, canvas.height, data.amplification, data.density_key);
+			}
+	
+			if (zoom_area_start) {
+				let zoom_area_screen_start = (zoom_area_start - focus) / screen_to_real + canvas.width * 0.5;
+				let zoom_area_screen_end = view_mouse_x;
+				let zoom_area_screen_left = Math.min(zoom_area_screen_start, zoom_area_screen_end);
+				let zoom_area_screen_right = Math.max(zoom_area_screen_start, zoom_area_screen_end);
+				let zoom_area_screen_width = zoom_area_screen_right - zoom_area_screen_left;
+				ctx.fillStyle = "rgba(100, 100, 240, 0.5)";
+				if (zoom_area_screen_width < min_zoom_area_width)
+					ctx.fillStyle = "rgba(100, 100, 240, 0.25)";
+				ctx.fillRect(zoom_area_screen_left, 0, zoom_area_screen_width, canvas.height);
+			}
 		}
 	}
 }

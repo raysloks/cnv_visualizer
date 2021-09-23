@@ -473,7 +473,7 @@ window.onload = function () {
 	context_menu_element.style.display = "none";
 	document.body.appendChild(context_menu_element);
 
-	document.addEventListener("mousedown", (ev) => {
+	document.addEventListener("pointerdown", (ev) => {
 		if (is_parent_recursive(ev.target, context_menu_element) == false) {
 			context_menu_element.style.display = "none";
 		}
@@ -514,17 +514,17 @@ window.onload = function () {
 					}
 				};
 
-				clip.canvas.onmousedown = (ev) => {
+				clip.canvas.onpointerdown = (ev) => {
 					if (ev.which == 1) {
 						zoom_area_start = (ev.clientX - document.body.clientWidth * 0.5) * screen_to_real + focus;
 						zoom_area_end = zoom_area_start;
 						view_mouse_x = ev.clientX;
 						clip.canvas.setPointerCapture(ev.pointerId);
-						clip.canvas.onmousemove = (ev) => {
+						clip.canvas.onpointermove = (ev) => {
 							zoom_area_end = (ev.clientX - document.body.clientWidth * 0.5) * screen_to_real + focus;
 							view_mouse_x = ev.clientX;
 						};
-						clip.canvas.onmouseup = (ev) => {
+						clip.canvas.onpointerup = (ev) => {
 							if (ev.which != 1)
 								return;
 							zoom_area_end = (ev.clientX - document.body.clientWidth * 0.5) * screen_to_real + focus;
@@ -534,32 +534,33 @@ window.onload = function () {
 							zoom_area_start = null;
 							zoom_area_end = null;
 							clip.canvas.releasePointerCapture(ev.pointerId);
-							clip.canvas.onmousemove = null;
-							clip.canvas.onmouseup = null;
+							clip.canvas.onpointermove = null;
+							clip.canvas.onpointerup = null;
 						};
 					}
 					if (ev.which == 2) {
 						let grab_position = (ev.clientX - document.body.clientWidth * 0.5) * screen_to_real + focus;
 						clip.canvas.classList.add("grabbing");
 						clip.canvas.setPointerCapture(ev.pointerId);
-						clip.canvas.onmousemove = (ev) => {
+						clip.canvas.onpointermove = (ev) => {
 							let last_focus = focus;
 							focus = grab_position - (ev.clientX - document.body.clientWidth * 0.5) * screen_to_real;
 							if (last_focus != focus)
 								render_out_of_date = true;
 						};
-						clip.canvas.onmouseup = (ev) => {
+						clip.canvas.onpointerup = (ev) => {
 							if (ev.which != 2)
 								return;
 							clip.canvas.classList.remove("grabbing");
 							clip.canvas.releasePointerCapture(ev.pointerId);
-							clip.canvas.onmousemove = null;
-							clip.canvas.onmouseup = null;
+							clip.canvas.onpointermove = null;
+							clip.canvas.onpointerup = null;
 
 							// scuffed
 							smooth_zoom_target_focus = focus;
 							smooth_zoom_target_screen_to_real = screen_to_real;
 						};
+						ev.preventDefault();
 					}
 				};
 			}
@@ -604,30 +605,30 @@ window.onload = function () {
 
 			clip.resizer = document.createElement("div");
 			clip.resizer.classList.add("clip_resizer");
-			clip.resizer.onmousedown = (ev) => {
+			clip.resizer.onpointerdown = (ev) => {
 				clip.resizer.setPointerCapture(ev.pointerId);
-				clip.resizer.onmousemove = (e) => {
+				clip.resizer.onpointermove = (e) => {
 					let height = Math.round(e.clientY - clip.canvas.getBoundingClientRect().top);
 					if (clip.canvas.height != height)
 						clip.canvas.height = height;
 				};
 				return false;
 			};
-			clip.resizer.onmouseup = (ev) => {
+			clip.resizer.onpointerup = (ev) => {
 				clip.resizer.releasePointerCapture(ev.pointerId);
-				clip.resizer.onmousemove = null;
+				clip.resizer.onpointermove = null;
 			};
 			clip.wrapper.appendChild(clip.resizer);
 
 			clip.grabber = document.createElement("img");
 			clip.grabber.src = "../../../../cnv_visualizer/data_viewer/handle2.svg";
 			clip.grabber.classList.add("clip_grabber");
-			clip.grabber.onmousedown = (ev) => {
+			clip.grabber.onpointerdown = (ev) => {
 				clip.grabber.style.cursor = "grabbing";
 				let grabber_rect = clip.grabber.getBoundingClientRect();
 				let grab_offset_y = (grabber_rect.top + grabber_rect.height * 0.5) - ev.clientY;
 				clip.grabber.setPointerCapture(ev.pointerId);
-				clip.grabber.onmousemove = (e) => {
+				clip.grabber.onpointermove = (e) => {
 					let wrapper_rect = clip.wrapper.getBoundingClientRect();
 					let y_offset = wrapper_rect.height * 0.5;
 					let grabber_y = e.clientY + grab_offset_y;
@@ -666,11 +667,11 @@ window.onload = function () {
 				};
 				return false;
 			};
-			clip.grabber.onmouseup = (ev) => {
+			clip.grabber.onpointerup = (ev) => {
 				clip.grabber.style.cursor = "";
 				clip.grabber.style.transform = "";
 				clip.grabber.releasePointerCapture(ev.pointerId);
-				clip.grabber.onmousemove = null;
+				clip.grabber.onpointermove = null;
 			};
 			clip.wrapper.appendChild(clip.grabber);
 			
