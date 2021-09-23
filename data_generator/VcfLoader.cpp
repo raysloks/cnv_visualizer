@@ -253,7 +253,7 @@ int VcfLoader::filterBafCalls(GenomeData& data, std::istream& is_filter, std::is
 				is_filter.read((char*)&filter_last_key, sizeof(filter_last_key));
 				is_filter.read((char*)&filter_last_freq, sizeof(filter_last_freq));
 
-				if (filter_last_key & 0xff >= 128)
+				if ((filter_last_key & 0xff) >= 128)
 				{
 					++pos_count;
 					if (current_filter_pos_has_call == false)
