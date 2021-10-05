@@ -166,8 +166,8 @@ function getVisibleChunks(minimum_bin_size, left, right) {
 function render(render_bin_size, repaint) {
 
 	{
-		let view = views.find(e => e.type == "overview");
-		for (let clip of view.clips) {
+		let overview_clips = clips.filter(e => e.type == "overview");
+		for (let clip of overview_clips) {
 			if (clip.canvases) {
 				for (let i = 0; i < clip.canvases.length; ++i) {
 					let canvas = clip.canvases[i];
@@ -198,7 +198,7 @@ function render(render_bin_size, repaint) {
 			}
 			if (clip.canvas) {
 
-				let current_chromosome_overview_a = view.clips[0].canvases[chromosome_index].parentNode;
+				let current_chromosome_overview_a = overview_clips.find(e => e.canvases).canvases[chromosome_index].parentNode;
 				let zoom_overlay = current_chromosome_overview_a.querySelector(".overview_zoom_overlay");
 				
 				let rect = zoom_overlay.getBoundingClientRect();
@@ -260,9 +260,59 @@ function render(render_bin_size, repaint) {
 	let half_size = screen_to_real * document.body.clientWidth * 0.5;
 	let [visible_chunks, bin_size] = getVisibleChunks(screen_to_real * resolution_modifier, focus - half_size, focus + half_size);
 
-	let view = views.find(e => e.type == "chromosome");
+	let transcript_clips = clips.filter(e => e.type == "transcript");
+	for (const clip of transcript_clips) {
+	
+		if (clip.generator)
+			clip.generator.next();
+
+		let canvas = clip.canvas;
+
+		let repaint_clip = repaint;
+
+		if (canvas.width != document.body.clientWidth) {
+			canvas.width = document.body.clientWidth;
+			repaint_clip = true;
+		}
+
+		if (clip.height != canvas.height) {
+			clip.height = canvas.height;
+			repaint_clip = true;
+		}
+
+		if (clip.render_out_of_date) {
+			clip.render_out_of_date = false;
+			repaint_clip = true;
+		}
+
+		if (repaint_clip === false) {
+			continue;
+		}
+
+		let ctx = canvas.getContext("2d");
+
+		ctx.setTransform(1, 0, 0, 1, 0, 0);
+		ctx.clearRect(0, 0, canvas.width, canvas.height);
+		
+		if (clip.chromosomes) {
+			let transcripts = clip.chromosomes[chr.name];
+			if (transcripts) {
+				// this is probably really slow
+				for (const record of transcripts) {
+					let screen_pos = (record[3] - focus) / screen_to_real + canvas.width * 0.5;
+					let screen_end = (record[4] - focus) / screen_to_real + canvas.width * 0.5;
+					if (screen_pos < canvas.width || screen_end > 0) {
+						ctx.fillStyle = "rgba(200, 10, 10, 0.25)";
+						ctx.fillRect(screen_pos, 0, screen_end - screen_pos, canvas.height);
+					}
+				}
+			}
+		}
+	}
+
+	let chromosome_clips = clips.filter(e => e.type == null);
 	if (visible_chunks) {
-		for (const clip of view.clips) {
+		for (const clip of chromosome_clips) {
 	
 			let x_start = (visible_chunks[0].offset - focus) / screen_to_real + document.body.clientWidth * 0.5;
 	

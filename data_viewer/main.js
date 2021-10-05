@@ -144,8 +144,8 @@ function check_update() {
 			if (current_chromosome_dropdown_a.href != hash)
 				current_chromosome_dropdown_a.href = hash;
 			// this is super scuffed
-			let view = views.find(e => e.type == "overview");
-			let current_chromosome_overview_a = view.clips[0].canvases[chromosome_index].parentNode;
+			let clip = clips.find(e => e.type == "overview" && e.canvases);
+			let current_chromosome_overview_a = clip.canvases[chromosome_index].parentNode;
 			if (current_chromosome_overview_a.href != hash) {
 				current_chromosome_overview_a.href = hash;
 			}
@@ -162,7 +162,7 @@ function check_update() {
 			}
 			current_chromosome_overview_a.classList.add("overview_current");
 			if (last_chromosome_index !== chromosome_index && last_chromosome_index !== null) {
-				let last_chromosome_overview_a = view.clips[0].canvases[last_chromosome_index].parentNode;
+				let last_chromosome_overview_a = clip.canvases[last_chromosome_index].parentNode;
 				last_chromosome_overview_a.classList.remove("overview_current");
 			}
 		}
@@ -232,210 +232,263 @@ function on_animation_frame(timestamp) {
 }
 
 // very temp initialization
-let views = [
+let clips = [
 	{
-		type: "overview",
 		height: 80,
-		clips: [
+		label: "Overview",
+		type: "overview",
+		data: [
 			{
-				height: 80,
-				label: "Overview",
-				data: [
-					{
-						keys: [
-							"base_a_density",
-							"base_c_density",
-							"base_g_density",
-							"base_t_density"
-						],
-						colors: [
-							[0.2, 0.0, 0.0],
-							[1.0, 1.0, 0.0],
-							[0.0, 1.0, 0.0],
-							[0.0, 0.0, 0.2]
-						],
-						labels: [
-							"A",
-							"C",
-							"G",
-							"T"
-						],
-						amplification: 5,
-						density_key: "base_total_density"
-					}
-				]
-			},
-			{
-				height: 40
+				keys: [
+					"base_a_density",
+					"base_c_density",
+					"base_g_density",
+					"base_t_density"
+				],
+				colors: [
+					[0.2, 0.0, 0.0],
+					[1.0, 1.0, 0.0],
+					[0.0, 1.0, 0.0],
+					[0.0, 0.0, 0.2]
+				],
+				labels: [
+					"A",
+					"C",
+					"G",
+					"T"
+				],
+				amplification: 5,
+				density_key: "base_total_density"
 			}
 		]
 	},
 	{
-		type: "chromosome",
-		height: 450,
-		clips: [
+		height: 40,
+		type: "overview"
+	},
+	{
+		height: 50,
+		label: "Raw Base Densities",
+		data: [
 			{
-				height: 50,
-				label: "Raw Base Densities",
-				data: [
-					{
-						keys: [
-							"base_a_density",
-							"base_c_density",
-							"base_g_density",
-							"base_t_density"
-						],
-						colors: [
-							[0.2, 0.0, 0.0],
-							[1.0, 1.0, 0.0],
-							[0.0, 1.0, 0.0],
-							[0.0, 0.0, 0.2]
-						],
-						labels: [
-							"A",
-							"C",
-							"G",
-							"T"
-						],
-						amplification: 5,
-						density_key: "base_total_density"
-					}
-				]
-			},
-			{
-				height: 50,
-				label: "Coverage Density",
-				view: {
-					top_base: 1.05,
-					bot_base: -0.05
-				},
-				data: [
-					{
-						key: "coverage_density",
-						fill: "rgba(10, 10, 200, 0.5)"
-					}
-				]
-			},
-			{
-				height: 150,
-				label: "Coverage (Log2)",
-				view: {
-					top_base: 0.75,
-					bot_base: -1.25,
-					top_scaling: 0.0075,
-					bot_scaling: -0.0125
-				},
-				data: [
-					{
-						key: "coverage_min_log2",
-						density_key: "coverage_density"
-					},
-					{
-						key: "coverage_mean_log2",
-						density_key: "coverage_density"
-					},
-					{
-						key: "coverage_max_log2",
-						density_key: "coverage_density"
-					},
-					{
-						key: "coverage_mean_log2_negative",
-						density_key: "coverage_density_negative"
-					},
-					{
-						key: "coverage_mean_log2_positive",
-						density_key: "coverage_density_positive"
-					}
+				keys: [
+					"base_a_density",
+					"base_c_density",
+					"base_g_density",
+					"base_t_density"
 				],
-				lines: [
-					{
-						y: 0,
-						style: "rgba(50, 50, 200, 0.5)"
-					}
-				]
-			},
-			{
-				height: 50,
-				label: "BAF Mean",
-				view: {
-					top_base: 1.05,
-					bot_base: -0.05
-				},
-				data: [
-					{
-						key: "baf_mean",
-						density_key: "baf_total_density",
-						point_mod: 1 / 16
-					}
-				]
-			},
-			{
-				height: 50,
-				label: "BAF Top Density",
-				view: {
-					top_base: 1.05,
-					bot_base: -0.05
-				},
-				data: [
-					{
-						key: "baf_top_density",
-						func: value => value / (value + 0.5),
-						fill: "rgba(10, 200, 10, 0.5)"
-					}
-				]
-			},
-			{
-				height: 50,
-				label: "BAF Total Density",
-				view: {
-					top_base: 1.05,
-					bot_base: -0.05
-				},
-				data: [
-					{
-						key: "baf_total_density",
-						func: value => value / (value + 0.5),
-						fill: "rgba(10, 200, 10, 0.5)"
-					}
-				]
-			},
-			{
-				height: 50,
-				label: "BAF Bottom Density",
-				view: {
-					top_base: 1.05,
-					bot_base: -0.05
-				},
-				data: [
-					{
-						key: "baf_bot_density",
-						func: value => value / (value + 0.5),
-						fill: "rgba(10, 200, 10, 0.5)"
-					}
-				]
-			},
-			{
-				height: 100,
-				label: "Coverage Points (Log2)",
-				view: {
-					top_base: 0.75,
-					bot_base: -0.75,
-					top_scaling: 0.0075,
-					bot_scaling: -0.0075
-				},
-				data: [
-					{
-						key: "coverage_mean_log2",
-						density_key: "coverage_density",
-						point_mod: 1 / 16
-					}
+				colors: [
+					[0.2, 0.0, 0.0],
+					[1.0, 1.0, 0.0],
+					[0.0, 1.0, 0.0],
+					[0.0, 0.0, 0.2]
 				],
-				lines: [
-					{
-						y: 0,
-						style: "rgba(50, 50, 200, 0.5)"
-					}
-				]
+				labels: [
+					"A",
+					"C",
+					"G",
+					"T"
+				],
+				amplification: 5,
+				density_key: "base_total_density"
+			}
+		]
+	},
+	{
+		height: 50,
+		label: "BAF Undersampled",
+		view: {
+			top_base: 1.05,
+			bot_base: -0.05
+		},
+		data: [
+			{
+				key: "baf_undersampled",
+				density_key: "baf_density",
+				point_mod: 1 / 16
+			}
+		]
+	},
+	{
+		height: 100,
+		label: "Coverage Points (Log2)",
+		view: {
+			top_base: 0.75,
+			bot_base: -0.75,
+			top_scaling: 0.0075,
+			bot_scaling: -0.0075
+		},
+		data: [
+			{
+				key: "coverage_mean_log2",
+				density_key: "coverage_density",
+				point_mod: 1 / 16
+			}
+		],
+		lines: [
+			{
+				y: 0,
+				style: "rgba(50, 50, 200, 0.5)"
+			}
+		]
+	},
+	{
+		height: 100,
+		type: "transcript",
+		label: "Transcripts",
+		sources: [
+			"../../../Homo_sapiens.GRCh37.87.gtf"
+		]
+	},
+	{
+		height: 50,
+		label: "Coverage Density",
+		view: {
+			top_base: 1.05,
+			bot_base: -0.05
+		},
+		data: [
+			{
+				key: "coverage_density",
+				fill: "rgba(10, 10, 200, 0.5)"
+			}
+		]
+	},
+	{
+		height: 150,
+		label: "Coverage (Log2)",
+		view: {
+			top_base: 0.75,
+			bot_base: -1.25,
+			top_scaling: 0.0075,
+			bot_scaling: -0.0125
+		},
+		data: [
+			{
+				key: "coverage_min_log2",
+				density_key: "coverage_density"
+			},
+			{
+				key: "coverage_mean_log2",
+				density_key: "coverage_density"
+			},
+			{
+				key: "coverage_max_log2",
+				density_key: "coverage_density"
+			},
+			{
+				key: "coverage_mean_log2_negative",
+				density_key: "coverage_density_negative"
+			},
+			{
+				key: "coverage_mean_log2_positive",
+				density_key: "coverage_density_positive"
+			}
+		],
+		lines: [
+			{
+				y: 0,
+				style: "rgba(50, 50, 200, 0.5)"
+			}
+		]
+	},
+	{
+		height: 50,
+		label: "BAF Means",
+		view: {
+			top_base: 1.05,
+			bot_base: -0.05
+		},
+		data: [
+			{
+				key: "baf_mean",
+				density_key: "baf_density"
+			},
+			{
+				key: "baf_mid_mean",
+				density_key: "baf_mid_density"
+			},
+			{
+				key: "baf_bot_mean",
+				density_key: "baf_bot_density"
+			},
+			{
+				key: "baf_top_mean",
+				density_key: "baf_top_density"
+			}
+		]
+	},
+	{
+		height: 50,
+		label: "BAF Deviation Mean",
+		view: {
+			top_base: 0.55,
+			bot_base: -0.05
+		},
+		data: [
+			{
+				key: "baf_dev_mean",
+				density_key: "baf_density"
+			}
+		]
+	},
+	{
+		height: 50,
+		label: "BAF Total Density",
+		view: {
+			top_base: 1.05,
+			bot_base: -0.05
+		},
+		data: [
+			{
+				key: "baf_density",
+				func: value => value / (value + 0.5),
+				fill: "rgba(10, 200, 10, 0.5)"
+			}
+		]
+	},
+	{
+		height: 50,
+		label: "BAF Top Density",
+		view: {
+			top_base: 1.05,
+			bot_base: -0.05
+		},
+		data: [
+			{
+				key: "baf_top_density",
+				func: value => value / (value + 0.5),
+				fill: "rgba(10, 200, 10, 0.5)"
+			}
+		]
+	},
+	{
+		height: 50,
+		label: "BAF Middle Density",
+		view: {
+			top_base: 1.05,
+			bot_base: -0.05
+		},
+		data: [
+			{
+				key: "baf_mid_density",
+				func: value => value / (value + 0.5),
+				fill: "rgba(10, 200, 10, 0.5)"
+			}
+		]
+	},
+	{
+		height: 50,
+		label: "BAF Bottom Density",
+		view: {
+			top_base: 1.05,
+			bot_base: -0.05
+		},
+		data: [
+			{
+				key: "baf_bot_density",
+				func: value => value / (value + 0.5),
+				fill: "rgba(10, 200, 10, 0.5)"
 			}
 		]
 	}
@@ -480,267 +533,301 @@ window.onload = function () {
 	});
 
 	let views_element = document.getElementById("views");
-	for (let view of views) {
-		for (let clip of view.clips ?? []) {
-			clip.wrapper = document.createElement("div");
-			clip.wrapper.className = "canvas_wrapper";
-			views_element.appendChild(clip.wrapper);
+	for (let clip of clips) {
+		clip.wrapper = document.createElement("div");
+		clip.wrapper.className = "canvas_wrapper";
+		views_element.appendChild(clip.wrapper);
 
-			if (view.type == "chromosome") {
+		if (clip.type == null) {
+			clip.canvas = document.createElement("canvas");
+			clip.canvas.height = clip.height;
+			clip.canvas.classList.add("canvas_cursor_text");
+			clip.wrapper.appendChild(clip.canvas);
+
+			clip.canvas.oncontextmenu = (ev) => {
+				let pos = (ev.clientX - document.body.clientWidth * 0.5) * screen_to_real + focus;
+				if (calls) {
+					let call_chr = calls.chromosomes[chr.name];
+					if (call_chr) {
+						let filtered_calls = call_chr.records.filter(e => e.pos <= pos && e.info["END"] >= pos);
+						if (filtered_calls.length > 0) {
+							context_menu_element.style.display = "";
+							context_menu_element.style.left = ev.clientX + "px";
+							context_menu_element.style.top = ev.clientY + "px";
+							context_menu_element.innerHTML = "";
+							for (let call of filtered_calls) {
+								let p = document.createElement("p");
+								p.innerText = call.id;
+								context_menu_element.appendChild(p);
+							}
+							return false;
+						}
+					}
+				}
+			};
+
+			clip.canvas.onpointerdown = (ev) => {
+				if (ev.which == 1) {
+					zoom_area_start = (ev.clientX - document.body.clientWidth * 0.5) * screen_to_real + focus;
+					zoom_area_end = zoom_area_start;
+					view_mouse_x = ev.clientX;
+					clip.canvas.setPointerCapture(ev.pointerId);
+					clip.canvas.onpointermove = (ev) => {
+						zoom_area_end = (ev.clientX - document.body.clientWidth * 0.5) * screen_to_real + focus;
+						view_mouse_x = ev.clientX;
+					};
+					clip.canvas.onpointerup = (ev) => {
+						if (ev.which != 1)
+							return;
+						zoom_area_end = (ev.clientX - document.body.clientWidth * 0.5) * screen_to_real + focus;
+						if (Math.abs(zoom_area_end - zoom_area_start) / screen_to_real >= min_zoom_area_width) {
+							perform_zoom(zoom_area_start, zoom_area_end);
+						}
+						zoom_area_start = null;
+						zoom_area_end = null;
+						clip.canvas.releasePointerCapture(ev.pointerId);
+						clip.canvas.onpointermove = null;
+						clip.canvas.onpointerup = null;
+					};
+				}
+				if (ev.which == 2) {
+					let grab_position = (ev.clientX - document.body.clientWidth * 0.5) * screen_to_real + focus;
+					clip.canvas.classList.add("grabbing");
+					clip.canvas.setPointerCapture(ev.pointerId);
+					clip.canvas.onpointermove = (ev) => {
+						let last_focus = focus;
+						focus = grab_position - (ev.clientX - document.body.clientWidth * 0.5) * screen_to_real;
+						if (last_focus != focus)
+							render_out_of_date = true;
+					};
+					clip.canvas.onpointerup = (ev) => {
+						if (ev.which != 2)
+							return;
+						clip.canvas.classList.remove("grabbing");
+						clip.canvas.releasePointerCapture(ev.pointerId);
+						clip.canvas.onpointermove = null;
+						clip.canvas.onpointerup = null;
+
+						// scuffed
+						smooth_zoom_target_focus = focus;
+						smooth_zoom_target_screen_to_real = screen_to_real;
+					};
+					ev.preventDefault();
+				}
+			};
+		}
+		if (clip.type == "overview") {
+			if (clip.data) {
+				clip.overview_wrapper = document.createElement("div");
+				clip.overview_wrapper.style.marginRight = "50px";
+				clip.wrapper.appendChild(clip.overview_wrapper);
+	
+				clip.canvases = [];
+				let total_size = chromosome_sizes.reduce((a, e) => a + e);
+				for (let i = 0; i < chromosome_sizes.length; ++i) {
+					let a = document.createElement("a");
+					a.href = "#" + chromosome_names[i];
+					a.classList.add("overview_link");
+					a.style.width = chromosome_sizes[i] / total_size * 100 + "%";
+					clip.overview_wrapper.appendChild(a);
+	
+					let canvas = document.createElement("canvas");
+					canvas.height = clip.height;
+					clip.canvases.push(canvas);
+					a.appendChild(canvas);
+	
+					let overlay = document.createElement("div");
+					overlay.classList.add("overlay");
+					overlay.classList.add("overview_highlight_overlay");
+					overlay.innerText = chromosome_names[i];
+					a.appendChild(overlay);
+	
+					let zoom_overlay = document.createElement("div");
+					zoom_overlay.classList.add("overlay");
+					zoom_overlay.classList.add("overview_zoom_overlay");
+					//zoom_overlay.style.display = "none";
+					a.appendChild(zoom_overlay);
+				}
+			} else {
 				clip.canvas = document.createElement("canvas");
 				clip.canvas.height = clip.height;
-				clip.canvas.classList.add("canvas_cursor_text");
 				clip.wrapper.appendChild(clip.canvas);
+			}
+		}
+		if (clip.type == "transcript") {
+			clip.canvas = document.createElement("canvas");
+			clip.canvas.height = clip.height;
+			clip.wrapper.appendChild(clip.canvas);
 
-				clip.canvas.oncontextmenu = (ev) => {
-					let pos = (ev.clientX - document.body.clientWidth * 0.5) * screen_to_real + focus;
-					if (calls) {
-						let call_chr = calls.chromosomes[chr.name];
-						if (call_chr) {
-							let filtered_calls = call_chr.records.filter(e => e.pos <= pos && e.info["END"] >= pos);
-							if (filtered_calls.length > 0) {
-								context_menu_element.style.display = "";
-								context_menu_element.style.left = ev.clientX + "px";
-								context_menu_element.style.top = ev.clientY + "px";
-								context_menu_element.innerHTML = "";
-								for (let call of filtered_calls) {
-									let p = document.createElement("p");
-									p.innerText = call.id;
-									context_menu_element.appendChild(p);
-								}
-								return false;
+			for (const source of clip.sources) {
+				fetch(source)
+				.then(response => response.text())
+				.then(data => {
+					function* generator(data) {
+						clip.chromosomes = {};
+						let position = 0;
+						let yield_counter = 0;
+						while (position < data.length) {
+							let next = data.findIndex("\n", position);
+							if (next == -1)
+								next = data.length;
+							let line = data.substring(position, next);
+							let fields = line.split("\t");
+							let chrom = clip.chromosomes[fields[0]] ?? [];
+							chrom.push(fields);
+							clip.chromosomes[fields[0]] = chrom;
+							position = next + 1;
+
+							if (++yield_counter >= 10) {
+								yield_counter = 0;
+								yield;
 							}
 						}
+						clip.render_out_of_date = true;
+						return;
 					}
-				};
-
-				clip.canvas.onpointerdown = (ev) => {
-					if (ev.which == 1) {
-						zoom_area_start = (ev.clientX - document.body.clientWidth * 0.5) * screen_to_real + focus;
-						zoom_area_end = zoom_area_start;
-						view_mouse_x = ev.clientX;
-						clip.canvas.setPointerCapture(ev.pointerId);
-						clip.canvas.onpointermove = (ev) => {
-							zoom_area_end = (ev.clientX - document.body.clientWidth * 0.5) * screen_to_real + focus;
-							view_mouse_x = ev.clientX;
-						};
-						clip.canvas.onpointerup = (ev) => {
-							if (ev.which != 1)
-								return;
-							zoom_area_end = (ev.clientX - document.body.clientWidth * 0.5) * screen_to_real + focus;
-							if (Math.abs(zoom_area_end - zoom_area_start) / screen_to_real >= min_zoom_area_width) {
-								perform_zoom(zoom_area_start, zoom_area_end);
-							}
-							zoom_area_start = null;
-							zoom_area_end = null;
-							clip.canvas.releasePointerCapture(ev.pointerId);
-							clip.canvas.onpointermove = null;
-							clip.canvas.onpointerup = null;
-						};
-					}
-					if (ev.which == 2) {
-						let grab_position = (ev.clientX - document.body.clientWidth * 0.5) * screen_to_real + focus;
-						clip.canvas.classList.add("grabbing");
-						clip.canvas.setPointerCapture(ev.pointerId);
-						clip.canvas.onpointermove = (ev) => {
-							let last_focus = focus;
-							focus = grab_position - (ev.clientX - document.body.clientWidth * 0.5) * screen_to_real;
-							if (last_focus != focus)
-								render_out_of_date = true;
-						};
-						clip.canvas.onpointerup = (ev) => {
-							if (ev.which != 2)
-								return;
-							clip.canvas.classList.remove("grabbing");
-							clip.canvas.releasePointerCapture(ev.pointerId);
-							clip.canvas.onpointermove = null;
-							clip.canvas.onpointerup = null;
-
-							// scuffed
-							smooth_zoom_target_focus = focus;
-							smooth_zoom_target_screen_to_real = screen_to_real;
-						};
-						ev.preventDefault();
-					}
-				};
+					clip.generator = generator(data);
+				});
 			}
-			if (view.type == "overview") {
-				if (clip === view.clips[0]) {
-					clip.overview_wrapper = document.createElement("div");
-					clip.overview_wrapper.style.marginRight = "50px";
-					clip.wrapper.appendChild(clip.overview_wrapper);
+		}
 
-					clip.canvases = [];
-					let total_size = chromosome_sizes.reduce((a, e) => a + e);
-					for (let i = 0; i < chromosome_sizes.length; ++i) {
-						let a = document.createElement("a");
-						a.href = "#" + chromosome_names[i];
-						a.classList.add("overview_link");
-						a.style.width = chromosome_sizes[i] / total_size * 100 + "%";
-						clip.overview_wrapper.appendChild(a);
-	
-						let canvas = document.createElement("canvas");
-						canvas.height = clip.height;
-						clip.canvases.push(canvas);
-						a.appendChild(canvas);
-	
-						let overlay = document.createElement("div");
-						overlay.classList.add("overlay");
-						overlay.classList.add("overview_highlight_overlay");
-						overlay.innerText = chromosome_names[i];
-						a.appendChild(overlay);
-	
-						let zoom_overlay = document.createElement("div");
-						zoom_overlay.classList.add("overlay");
-						zoom_overlay.classList.add("overview_zoom_overlay");
-						//zoom_overlay.style.display = "none";
-						a.appendChild(zoom_overlay);
+		clip.resizer = document.createElement("div");
+		clip.resizer.classList.add("clip_resizer");
+		clip.resizer.onpointerdown = (ev) => {
+			clip.resizer.setPointerCapture(ev.pointerId);
+			clip.resizer.onpointermove = (e) => {
+				let height = Math.round(e.clientY - clip.canvas.getBoundingClientRect().top);
+				if (clip.canvas.height != height)
+					clip.canvas.height = height;
+			};
+			return false;
+		};
+		clip.resizer.onpointerup = (ev) => {
+			clip.resizer.releasePointerCapture(ev.pointerId);
+			clip.resizer.onpointermove = null;
+		};
+		clip.wrapper.appendChild(clip.resizer);
+
+		clip.grabber = document.createElement("img");
+		clip.grabber.src = "../../../../cnv_visualizer/data_viewer/handle2.svg";
+		clip.grabber.classList.add("clip_grabber");
+		clip.grabber.onpointerdown = (ev) => {
+			clip.grabber.style.cursor = "grabbing";
+			let grabber_rect = clip.grabber.getBoundingClientRect();
+			let grab_offset_y = (grabber_rect.top + grabber_rect.height * 0.5) - ev.clientY;
+			clip.grabber.setPointerCapture(ev.pointerId);
+			clip.grabber.onpointermove = (e) => {
+				let wrapper_rect = clip.wrapper.getBoundingClientRect();
+				let y_offset = wrapper_rect.height * 0.5;
+				let grabber_y = e.clientY + grab_offset_y;
+
+				let parent = clip.wrapper.parentNode;
+				let wrappers = Array.from(parent.children);
+
+				let closest_diff = grabber_y - (wrappers[wrappers.length - 1].getBoundingClientRect().bottom + y_offset - wrapper_rect.height);
+				let closest_index = wrappers.length;
+
+				for (let i = 0; i < wrappers.length; ++i) {
+					let rect = wrappers[i].getBoundingClientRect();
+					let y = rect.top + y_offset;
+					let diff = grabber_y - y;
+					if (Math.abs(diff) < Math.abs(closest_diff)) {
+						closest_diff = diff;
+						closest_index = i;
 					}
-				} else {
-					clip.canvas = document.createElement("canvas");
-					clip.canvas.height = clip.height;
-					clip.wrapper.appendChild(clip.canvas);
+					if (wrappers[i] === clip.wrapper) {
+						y_offset -= rect.height;
+					}
 				}
-			}
-
-			clip.resizer = document.createElement("div");
-			clip.resizer.classList.add("clip_resizer");
-			clip.resizer.onpointerdown = (ev) => {
-				clip.resizer.setPointerCapture(ev.pointerId);
-				clip.resizer.onpointermove = (e) => {
-					let height = Math.round(e.clientY - clip.canvas.getBoundingClientRect().top);
-					if (clip.canvas.height != height)
-						clip.canvas.height = height;
-				};
-				return false;
-			};
-			clip.resizer.onpointerup = (ev) => {
-				clip.resizer.releasePointerCapture(ev.pointerId);
-				clip.resizer.onpointermove = null;
-			};
-			clip.wrapper.appendChild(clip.resizer);
-
-			clip.grabber = document.createElement("img");
-			clip.grabber.src = "../../../../cnv_visualizer/data_viewer/handle2.svg";
-			clip.grabber.classList.add("clip_grabber");
-			clip.grabber.onpointerdown = (ev) => {
-				clip.grabber.style.cursor = "grabbing";
-				let grabber_rect = clip.grabber.getBoundingClientRect();
-				let grab_offset_y = (grabber_rect.top + grabber_rect.height * 0.5) - ev.clientY;
-				clip.grabber.setPointerCapture(ev.pointerId);
-				clip.grabber.onpointermove = (e) => {
-					let wrapper_rect = clip.wrapper.getBoundingClientRect();
-					let y_offset = wrapper_rect.height * 0.5;
-					let grabber_y = e.clientY + grab_offset_y;
-
-					let parent = clip.wrapper.parentNode;
-					let wrappers = Array.from(parent.children);
-
-					let closest_diff = grabber_y - (wrappers[wrappers.length - 1].getBoundingClientRect().bottom + y_offset - wrapper_rect.height);
-					let closest_index = wrappers.length;
-
-					for (let i = 0; i < wrappers.length; ++i) {
-						let rect = wrappers[i].getBoundingClientRect();
-						let y = rect.top + y_offset;
-						let diff = grabber_y - y;
-						if (Math.abs(diff) < Math.abs(closest_diff)) {
-							closest_diff = diff;
-							closest_index = i;
-						}
-						if (wrappers[i] === clip.wrapper) {
-							y_offset -= rect.height;
-						}
+				if (wrappers[closest_index] !== clip.wrapper) {
+					for (let i = 0; i < closest_index; ++i) {
+						if (wrappers[i] !== clip.wrapper)
+							parent.appendChild(wrappers[i]);
 					}
-					if (wrappers[closest_index] !== clip.wrapper) {
-						for (let i = 0; i < closest_index; ++i) {
-							if (wrappers[i] !== clip.wrapper)
-								parent.appendChild(wrappers[i]);
-						}
-						parent.appendChild(clip.wrapper);
-						for (let i = closest_index; i < wrappers.length; ++i) {
-							if (wrappers[i] !== clip.wrapper)
-								parent.appendChild(wrappers[i]);
-						}
-						clip.grabber.setPointerCapture(e.pointerId);
+					parent.appendChild(clip.wrapper);
+					for (let i = closest_index; i < wrappers.length; ++i) {
+						if (wrappers[i] !== clip.wrapper)
+							parent.appendChild(wrappers[i]);
 					}
-					clip.grabber.style.transform = `translateY(calc(${closest_diff}px - 50%))`;
-				};
-				return false;
+					clip.grabber.setPointerCapture(e.pointerId);
+				}
+				clip.grabber.style.transform = `translateY(calc(${closest_diff}px - 50%))`;
 			};
-			clip.grabber.onpointerup = (ev) => {
-				clip.grabber.style.cursor = "";
-				clip.grabber.style.transform = "";
-				clip.grabber.releasePointerCapture(ev.pointerId);
-				clip.grabber.onpointermove = null;
-			};
-			clip.wrapper.appendChild(clip.grabber);
-			
-			let overlay = document.createElement("div");
-			overlay.className = "clip_overlay";
-			clip.wrapper.appendChild(overlay);
+			return false;
+		};
+		clip.grabber.onpointerup = (ev) => {
+			clip.grabber.style.cursor = "";
+			clip.grabber.style.transform = "";
+			clip.grabber.releasePointerCapture(ev.pointerId);
+			clip.grabber.onpointermove = null;
+		};
+		clip.wrapper.appendChild(clip.grabber);
+		
+		let overlay = document.createElement("div");
+		overlay.className = "clip_overlay";
+		clip.wrapper.appendChild(overlay);
 
-			let label = document.createElement("a");
-			label.innerHTML = clip.label ?? "";
-			label.className = "label";
-			overlay.appendChild(label);
-			
-			let cogwheel = document.createElement("img");
-			cogwheel.className = "cogwheel";
-			cogwheel.src = "../../../../cnv_visualizer/data_viewer/cogwheel.svg";
-			cogwheel.alt = "Options";
-			overlay.appendChild(cogwheel);
+		let label = document.createElement("a");
+		label.innerHTML = clip.label ?? "";
+		label.className = "label";
+		overlay.appendChild(label);
+		
+		let cogwheel = document.createElement("img");
+		cogwheel.className = "cogwheel";
+		cogwheel.src = "../../../../cnv_visualizer/data_viewer/cogwheel.svg";
+		cogwheel.alt = "Options";
+		overlay.appendChild(cogwheel);
 
-			let options_panel = document.createElement("div");
-			options_panel.className = "options_panel";
-			options_panel.style.display = "none";
-			overlay.appendChild(options_panel);
+		let options_panel = document.createElement("div");
+		options_panel.className = "options_panel";
+		options_panel.style.display = "none";
+		overlay.appendChild(options_panel);
 
-			cogwheel.onclick = () => {
-				options_panel.style.display = options_panel.style.display == "none" ? "block" : "none";
-			};
+		cogwheel.onclick = () => {
+			options_panel.style.display = options_panel.style.display == "none" ? "block" : "none";
+		};
 
-			if (clip.data) {
-				for (let data of clip.data) {
-					if (data.colors) {
-						for (let i = 0; i < data.colors.length; ++i) {
-							let label = document.createElement("label");
-							label.innerText = data.labels[i];
-							options_panel.appendChild(label);
+		if (clip.data) {
+			for (let data of clip.data) {
+				if (data.colors) {
+					for (let i = 0; i < data.colors.length; ++i) {
+						let label = document.createElement("label");
+						label.innerText = data.labels[i];
+						options_panel.appendChild(label);
 
-							let input = document.createElement("input");
-							input.type = "color";
-							input.value = rgb_to_hex(data.colors[i].map(e => Math.floor(e * 255)));
-							input.oninput = (ev) => {
-								data.colors[i] = hex_to_rgb(ev.target.value).map(e => e / 255);
-								clip.render_out_of_date = true;
-							};
-							options_panel.appendChild(input);
-						}
-					}
-					if (data.amplification) {
-						let slider = document.createElement("input");
-						slider.type = "range";
-						slider.min = "1";
-						slider.max = "10";
-						slider.step = "0.01";
-						slider.value = data.amplification;
-						slider.oninput = (ev) => {
-							data.amplification = parseFloat(ev.target.value);
+						let input = document.createElement("input");
+						input.type = "color";
+						input.value = rgb_to_hex(data.colors[i].map(e => Math.floor(e * 255)));
+						input.oninput = (ev) => {
+							data.colors[i] = hex_to_rgb(ev.target.value).map(e => e / 255);
 							clip.render_out_of_date = true;
 						};
-						options_panel.appendChild(slider);
+						options_panel.appendChild(input);
 					}
-					if (data.point_mod) {
-						let toggle = document.createElement("input");
-						toggle.type = "checkbox";
-						let inital_value = data.point_mod;
-						toggle.checked = true;
-						toggle.oninput = (ev) => {
-							data.point_mod = ev.target.checked ? inital_value : null;
-							clip.render_out_of_date = true;
-						};
-						options_panel.appendChild(toggle);
-					}
+				}
+				if (data.amplification) {
+					let slider = document.createElement("input");
+					slider.type = "range";
+					slider.min = "1";
+					slider.max = "10";
+					slider.step = "0.01";
+					slider.value = data.amplification;
+					slider.oninput = (ev) => {
+						data.amplification = parseFloat(ev.target.value);
+						clip.render_out_of_date = true;
+					};
+					options_panel.appendChild(slider);
+				}
+				if (data.point_mod) {
+					let toggle = document.createElement("input");
+					toggle.type = "checkbox";
+					let inital_value = data.point_mod;
+					toggle.checked = true;
+					toggle.oninput = (ev) => {
+						data.point_mod = ev.target.checked ? inital_value : null;
+						clip.render_out_of_date = true;
+					};
+					options_panel.appendChild(toggle);
 				}
 			}
 		}
