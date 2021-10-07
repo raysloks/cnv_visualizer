@@ -3,6 +3,8 @@
 #include <iostream>
 #include <limits>
 
+#include "Utility.h"
+
 VcfLoader::VcfLoader()
 {
 	baf_key = "AF";
@@ -185,8 +187,6 @@ int VcfLoader::createBafFilter(std::istream& is, std::ostream& os)
 
 int VcfLoader::filterBafCalls(GenomeData& data, std::istream& is_filter, std::istream& is_calls)
 {
-	std::cout << "filtering..." << std::endl;
-
 	for (auto& chr : data.chromosomes)
 	{
 		chr.baf_data.resize(chr.log2_coverage_data.size());
@@ -208,7 +208,9 @@ int VcfLoader::filterBafCalls(GenomeData& data, std::istream& is_filter, std::is
 	int64_t ref_count = 0;
 	int64_t match_count = 0;
 	int64_t miss_count = 0;
-	
+	int64_t pos_match_count = 0;
+	int64_t pos_success_count = 0;
+
 	std::string line;
 	while (std::getline(is_calls, line))
 	{
@@ -237,9 +239,10 @@ int VcfLoader::filterBafCalls(GenomeData& data, std::istream& is_filter, std::is
 			if (alt == '<')
 				continue;
 
-			int64_t calls_key = calls_chr_index;
-			calls_key <<= 32;
-			calls_key |= record.pos;
+			int64_t calls_chr_pos = calls_chr_index;
+			calls_chr_pos <<= 32;
+			calls_chr_pos |= record.pos;
+			int64_t calls_key = calls_chr_pos;
 			calls_key <<= 8;
 			calls_key |= alt;
 
@@ -253,6 +256,54 @@ int VcfLoader::filterBafCalls(GenomeData& data, std::istream& is_filter, std::is
 				is_filter.read((char*)&filter_last_key, sizeof(filter_last_key));
 				is_filter.read((char*)&filter_last_freq, sizeof(filter_last_freq));
 
+				int64_t filter_chr_pos = filter_last_key >> 8;
+				if (filter_chr_pos == calls_chr_pos)
+				{
+					++pos_match_count;
+					try
+					{
+						int64_t my_alt = std::stoi(split(record.getSampleData("GT"), '/')[1]);
+
+						int64_t my_alt_count = -1;
+						
+						auto ad_list = split(record.getSampleData("AD"), ',');
+						if (ad_list.size() > my_alt)
+						{
+							if (my_alt != 0)
+							{
+								my_alt_count = std::stoi(ad_list[my_alt]);
+							}
+							else
+							{
+								for (size_t i = 0; i < ad_list.size(); ++i)
+								{
+									int64_t alt_count = std::stoi(ad_list[i]);
+									if (alt_count > my_alt_count)
+										my_alt_count = alt_count;
+								}
+							}
+						}
+
+						int64_t my_dp = std::stoi(record.getSampleData("DP"));
+
+						if (my_alt_count >= 0 && my_dp >= 10)
+						{
+							int32_t filter_pos = (filter_last_key >> 8) & 0xffffffff;
+							int pos = (filter_pos - chr_data->offset) / chr_data->scale;
+							if (pos < 0 || pos >= chr_data->baf_data.size())
+								++out_of_bounds_count;
+							else
+								chr_data->baf_data[pos] += float(my_alt_count) / my_dp;
+							++pos_success_count;
+							break;
+						}
+					}
+					catch (const std::invalid_argument& ia)
+					{
+						// very lazy way to handle non-integer values
+					}
+				}
+
 				if ((filter_last_key & 0xff) >= 128)
 				{
 					++pos_count;
@@ -263,16 +314,16 @@ int VcfLoader::filterBafCalls(GenomeData& data, std::istream& is_filter, std::is
 						if (pos < 0 || pos >= chr_data->baf_data.size())
 							++out_of_bounds_count;
 						else
-							chr_data->baf_data[pos] += filter_last_freq;
+							;//chr_data->baf_data[pos] += filter_last_freq;
 						++ref_count;
 					}
 					current_filter_pos_has_call = false;
 				}
 			}
 
-			if (++progress_notify > 100000)
+			if (++progress_notify >= 100000)
 			{
-				progress_notify = 1;
+				progress_notify = 0;
 				int32_t filter_pos = (filter_last_key >> 8) & 0xffffffff;
 				char filter_alt = filter_last_key & 0xff;
 				int32_t filter_chr_index = filter_last_key >> 40;
@@ -284,6 +335,9 @@ int VcfLoader::filterBafCalls(GenomeData& data, std::istream& is_filter, std::is
 				std::cout << ref_count << std::endl;
 				std::cout << match_count << std::endl;
 				std::cout << miss_count << std::endl;
+				std::cout << pos_match_count << std::endl;
+				std::cout << pos_success_count << std::endl;
+				std::cout << record.getString() << std::endl << std::endl;
 			}
 
 			current_filter_pos_has_call = true;
@@ -293,7 +347,7 @@ int VcfLoader::filterBafCalls(GenomeData& data, std::istream& is_filter, std::is
 				if (pos < 0 || pos >= chr_data->baf_data.size())
 					++out_of_bounds_count;
 				else
-					chr_data->baf_data[pos] += filter_last_freq;
+					;//chr_data->baf_data[pos] += filter_last_freq;
 				++match_count;
 			}
 			else if (filter_last_key == std::numeric_limits<int64_t>::max())
@@ -307,7 +361,7 @@ int VcfLoader::filterBafCalls(GenomeData& data, std::istream& is_filter, std::is
 				if (pos < 0 || pos >= chr_data->baf_data.size())
 					++out_of_bounds_count;
 				else
-					chr_data->baf_data[pos] += 0.0f;
+					;//chr_data->baf_data[pos] += 0.0f;
 				++miss_count;
 			}
 		}

@@ -263,9 +263,6 @@ function render(render_bin_size, repaint) {
 	let transcript_clips = clips.filter(e => e.type == "transcript");
 	for (const clip of transcript_clips) {
 	
-		if (clip.generator)
-			clip.generator.next();
-
 		let canvas = clip.canvas;
 
 		let repaint_clip = repaint;
@@ -294,19 +291,50 @@ function render(render_bin_size, repaint) {
 		ctx.setTransform(1, 0, 0, 1, 0, 0);
 		ctx.clearRect(0, 0, canvas.width, canvas.height);
 		
-		if (clip.chromosomes) {
+		if (chr.name in clip.chromosomes) {
 			let transcripts = clip.chromosomes[chr.name];
 			if (transcripts) {
+				let colors = [
+					"rgba(200, 0, 0, 0.25)",
+					"rgba(100, 100, 0, 0.25)",
+					"rgba(0, 200, 0, 0.25)",
+					"rgba(0, 100, 100, 0.25)",
+					"rgba(0, 0, 200, 0.25)",
+					"rgba(100, 0, 100, 0.25)"
+				];
 				// this is probably really slow
-				for (const record of transcripts) {
-					let screen_pos = (record[3] - focus) / screen_to_real + canvas.width * 0.5;
-					let screen_end = (record[4] - focus) / screen_to_real + canvas.width * 0.5;
+				for (let i = 0; i < transcripts.length; i += 2) {
+					let screen_pos = (transcripts[i] - focus) / screen_to_real + canvas.width * 0.5;
+					let screen_end = (transcripts[i + 1] - focus) / screen_to_real + canvas.width * 0.5;
 					if (screen_pos < canvas.width || screen_end > 0) {
-						ctx.fillStyle = "rgba(200, 10, 10, 0.25)";
+						ctx.fillStyle = colors[(i / 2) % colors.length];
 						ctx.fillRect(screen_pos, 0, screen_end - screen_pos, canvas.height);
 					}
 				}
 			}
+		} else {
+			clip.chromosomes[chr.name] = null;
+
+			// make some copies to prevent reference capturing fuckery
+			let chr_name_locked = chr.name;
+			let clip_locked = clip; // this one might be fine without a copy
+			
+			fetch(clip.source + chr.name + ".ann")
+			.then(response => {
+				if (response.ok)
+					return response.arrayBuffer()
+				else
+					return null;
+			})
+			.then(arrayBuffer => {
+				if (arrayBuffer === null)
+					return;
+
+				let annotation_count = new Uint32Array(arrayBuffer, 0, 1)[0];
+				clip_locked.chromosomes[chr_name_locked] = new Uint32Array(arrayBuffer, 4, annotation_count * 2);
+
+				clip_locked.render_out_of_date = true;
+			});
 		}
 	}
 

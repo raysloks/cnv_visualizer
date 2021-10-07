@@ -336,9 +336,7 @@ let clips = [
 		height: 100,
 		type: "transcript",
 		label: "Transcripts",
-		sources: [
-			"../../../Homo_sapiens.GRCh37.87.gtf"
-		]
+		source: "../../../ensembl/"
 	},
 	{
 		height: 50,
@@ -658,37 +656,7 @@ window.onload = function () {
 			clip.canvas = document.createElement("canvas");
 			clip.canvas.height = clip.height;
 			clip.wrapper.appendChild(clip.canvas);
-
-			for (const source of clip.sources) {
-				fetch(source)
-				.then(response => response.text())
-				.then(data => {
-					function* generator(data) {
-						clip.chromosomes = {};
-						let position = 0;
-						let yield_counter = 0;
-						while (position < data.length) {
-							let next = data.findIndex("\n", position);
-							if (next == -1)
-								next = data.length;
-							let line = data.substring(position, next);
-							let fields = line.split("\t");
-							let chrom = clip.chromosomes[fields[0]] ?? [];
-							chrom.push(fields);
-							clip.chromosomes[fields[0]] = chrom;
-							position = next + 1;
-
-							if (++yield_counter >= 10) {
-								yield_counter = 0;
-								yield;
-							}
-						}
-						clip.render_out_of_date = true;
-						return;
-					}
-					clip.generator = generator(data);
-				});
-			}
+			clip.chromosomes = {};
 		}
 
 		clip.resizer = document.createElement("div");

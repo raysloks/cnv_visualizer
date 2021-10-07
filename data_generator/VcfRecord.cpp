@@ -45,6 +45,34 @@ VcfRecord::VcfRecord(const std::string& line)
 			info[key] = value;
 		}
 	}
+
+	{
+		size_t i = 0;
+		auto&& line = fields[8];
+		while (i < line.size())
+		{
+			size_t start = i;
+			do ++i; while (i < line.size() && line[i] != ':');
+			std::string fmt_id = line.substr(start, i - start);
+			++i;
+			format.push_back(fmt_id);
+		}
+	}
+
+	for (size_t j = 9; j < fields.size(); ++j)
+	{
+		samples.resize(samples.size() + 1);
+		size_t i = 0;
+		auto&& line = fields[j];
+		while (i < line.size())
+		{
+			size_t start = i;
+			do ++i; while (i < line.size() && line[i] != ':');
+			std::string sample_data = line.substr(start, i - start);
+			++i;
+			samples.back().push_back(sample_data);
+		}
+	}
 }
 
 std::string VcfRecord::getString() const
@@ -69,9 +97,25 @@ std::string VcfRecord::getString() const
 		not_first = true;
 	}
 	if (format.size() > 0)
-		str += "\t" + format;
-	for (auto& sample : samples)
-		str += "\t" + sample;
+	{
+		str += "\t";
+		for (size_t i = 0; i < format.size(); ++i)
+		{
+			if (i != 0)
+				str += ":";
+			str += format[i];
+		}
+		for (auto& sample : samples)
+		{
+			str += "\t";
+			for (size_t i = 0; i < sample.size(); ++i)
+			{
+				if (i != 0)
+					str += ":";
+				str += sample[i];
+			}
+		}
+	}
 	return str;
 }
 
@@ -102,4 +146,25 @@ std::vector<float> VcfRecord::getFloatInfoVector(const std::string& key) const
 		s = s.substr(index + 1);
 	}
 	return result;
+}
+
+size_t VcfRecord::getFormatIndex(const std::string& fmt_id) const
+{
+	for (size_t i = 0; i < format.size(); ++i)
+		if (format[i] == fmt_id)
+			return i;
+	return std::string::npos;
+}
+
+std::string VcfRecord::getSampleData(const std::string& fmt_id) const
+{
+	if (samples.empty())
+		return "";
+	auto& sample = samples[0];
+
+	size_t fmt_index = getFormatIndex(fmt_id);
+	if (fmt_index >= sample.size())
+		return "";
+	
+	return sample[fmt_index];
 }
