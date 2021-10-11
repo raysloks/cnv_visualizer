@@ -170,9 +170,6 @@ int main(int argc, char ** argv)
 		vcf_loader.createBafFilter(std::cin, vcf_os);
 	}
 
-<<<<<<< HEAD
-	if (tsv_path.size() || test_chr_sizes_fname.size())
-=======
 	if (compile_annotations_input.size())
 	{
 		std::cout << "compiling annotations..." << std::endl;
@@ -184,8 +181,7 @@ int main(int argc, char ** argv)
 		std::cout << "compiled annotations." << std::endl;
 	}
 
-	if (tsv_path.size() || test)
->>>>>>> a995affda55ed3e2925a8cde23910edf4e1e79a0
+	if (tsv_path.size() || test_chr_sizes_fname.size())
 	{
 		GenomeData data;
 
