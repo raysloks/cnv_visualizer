@@ -166,8 +166,8 @@ function getVisibleChunks(minimum_bin_size, left, right) {
 function render(render_bin_size, repaint) {
 
 	{
-		let view = views.find(e => e.type == "overview");
-		for (let clip of view.clips) {
+		let overview_clips = clips.filter(e => e.type == "overview");
+		for (let clip of overview_clips) {
 			if (clip.canvases) {
 				for (let i = 0; i < clip.canvases.length; ++i) {
 					let canvas = clip.canvases[i];
@@ -198,7 +198,7 @@ function render(render_bin_size, repaint) {
 			}
 			if (clip.canvas) {
 
-				let current_chromosome_overview_a = view.clips[0].canvases[chromosome_index].parentNode;
+				let current_chromosome_overview_a = overview_clips.find(e => e.canvases).canvases[chromosome_index].parentNode;
 				let zoom_overlay = current_chromosome_overview_a.querySelector(".overview_zoom_overlay");
 				
 				let rect = zoom_overlay.getBoundingClientRect();
@@ -260,9 +260,158 @@ function render(render_bin_size, repaint) {
 	let half_size = screen_to_real * document.body.clientWidth * 0.5;
 	let [visible_chunks, bin_size] = getVisibleChunks(screen_to_real * resolution_modifier, focus - half_size, focus + half_size);
 
-	let view = views.find(e => e.type == "chromosome");
+	let transcript_clips = clips.filter(e => e.type == "transcript");
+	for (const clip of transcript_clips) {
+	
+		let canvas = clip.canvas;
+
+		let repaint_clip = repaint;
+
+		if (canvas.width != document.body.clientWidth) {
+			canvas.width = document.body.clientWidth;
+			repaint_clip = true;
+		}
+
+		if (clip.height != canvas.height) {
+			clip.height = canvas.height;
+			repaint_clip = true;
+		}
+
+		if (clip.render_out_of_date) {
+			clip.render_out_of_date = false;
+			repaint_clip = true;
+		}
+
+		if (repaint_clip === false) {
+			continue;
+		}
+
+		let ctx = canvas.getContext("2d");
+
+		ctx.setTransform(1, 0, 0, 1, 0, 0);
+		ctx.clearRect(0, 0, canvas.width, canvas.height);
+		
+		if (chr.name in clip.chromosomes) {
+			let transcripts = clip.chromosomes[chr.name];
+			if (transcripts) {
+				let colors = [
+					"rgba(200, 0, 0, 0.25)",
+					"rgba(100, 100, 0, 0.25)",
+					"rgba(0, 200, 0, 0.25)",
+					"rgba(0, 100, 100, 0.25)",
+					"rgba(0, 0, 200, 0.25)",
+					"rgba(100, 0, 100, 0.25)"
+				];
+				// this is probably really slow
+				for (let i = 0; i < transcripts.count; ++i) {
+					let screen_pos = (transcripts.start[i] - focus) / screen_to_real + canvas.width * 0.5;
+					let screen_end = (transcripts.end[i] - focus) / screen_to_real + canvas.width * 0.5;
+					if (screen_pos < canvas.width || screen_end > 0) {
+						ctx.fillStyle = colors[i % colors.length];
+						ctx.fillRect(screen_pos, 0, screen_end - screen_pos, canvas.height);
+					}
+				}
+			}
+		} else if (clip.lookup) {
+			clip.chromosomes[chr.name] = null;
+
+			// make some copies to prevent reference capturing fuckery
+			let chr_name_locked = chr.name;
+			let clip_locked = clip;
+			
+			fetch(clip.source + chr.name + ".ann")
+			.then(response => {
+				if (response.ok)
+					return response.arrayBuffer()
+				else
+					return null;
+			})
+			.then(arrayBuffer => {
+				if (arrayBuffer === null)
+					return;
+
+				let annotation_count = new Uint32Array(arrayBuffer, 0, 1)[0];
+				let offset = 8;
+
+				let transcripts = {};
+				transcripts.count = annotation_count;
+
+				for (const data of clip_locked.lookup.data_sets) {
+					offset += 7 - (offset - 1) % 8;
+					switch (data.size) {
+						case 1:
+							transcripts[data.name] = new Uint8Array(arrayBuffer, offset, annotation_count);
+							offset += annotation_count;
+							break;
+						case 2:
+							transcripts[data.name] = new Uint16Array(arrayBuffer, offset, annotation_count);
+							offset += annotation_count * 2;
+							break;
+						case 4:
+							transcripts[data.name] = new Uint32Array(arrayBuffer, offset, annotation_count);
+							offset += annotation_count * 4;
+							break;
+						case 8:
+							transcripts[data.name] = new Uint64Array(arrayBuffer, offset, annotation_count);
+							offset += annotation_count * 8;
+							break;
+					}
+				}
+
+				for (const data of clip_locked.lookup.data_prefixes) {
+					offset += 7 - (offset - 1) % 8;
+					switch (data.size) {
+						case 1:
+							transcripts[data.name] = new Uint8Array(arrayBuffer, offset, annotation_count);
+							offset += annotation_count;
+							break;
+						case 2:
+							transcripts[data.name] = new Uint16Array(arrayBuffer, offset, annotation_count);
+							offset += annotation_count * 2;
+							break;
+						case 4:
+							transcripts[data.name] = new Uint32Array(arrayBuffer, offset, annotation_count);
+							offset += annotation_count * 4;
+							break;
+						case 8:
+							transcripts[data.name] = new Uint64Array(arrayBuffer, offset, annotation_count);
+							offset += annotation_count * 8;
+							break;
+					}
+				}
+
+				for (const data of clip_locked.lookup.data_values) {
+					offset += 7 - (offset - 1) % 8;
+					switch (data.size) {
+						case 1:
+							transcripts[data.name] = new Uint8Array(arrayBuffer, offset, annotation_count);
+							offset += annotation_count;
+							break;
+						case 2:
+							transcripts[data.name] = new Uint16Array(arrayBuffer, offset, annotation_count);
+							offset += annotation_count * 2;
+							break;
+						case 4:
+							transcripts[data.name] = new Uint32Array(arrayBuffer, offset, annotation_count);
+							offset += annotation_count * 4;
+							break;
+						case 8:
+							transcripts[data.name] = new Uint64Array(arrayBuffer, offset, annotation_count);
+							offset += annotation_count * 8;
+							break;
+					}
+				}
+
+				clip_locked.chromosomes[chr_name_locked] = transcripts;
+
+				clip_locked.render_out_of_date = true;
+			});
+		}
+	}
+
+	let chromosome_clips = clips.filter(e => e.type == null);
 	if (visible_chunks) {
-		for (const clip of view.clips) {
+		for (const clip of chromosome_clips) {
 	
 			let x_start = (visible_chunks[0].offset - focus) / screen_to_real + document.body.clientWidth * 0.5;
 	

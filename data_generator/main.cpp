@@ -13,6 +13,7 @@
 #include "VcfLoader.h"
 #include "BamLoader.h"
 #include "CmdOption.h"
+#include "GtfLoader.h"
 
 #include "Coal.h"
 
@@ -53,6 +54,9 @@ int main(int argc, char ** argv)
 	std::string create_baf_filter_key;
 	float create_baf_filter_cutoff;
 
+	std::string compile_annotations_input;
+	std::string compile_annotations_output;
+
 	std::string baf_calls;
 	std::string baf_filter;
 
@@ -70,7 +74,9 @@ int main(int argc, char ** argv)
 		CmdOption('s', "staining", "Add nucleotide base frequency data to final output using a .bam file.", 
 			"long desc", "help and example", std::vector<CmdValue>({ CmdValue(&bam_fname, true) })),
 		CmdOption('t', "test", "Generate fake testing data.", 
-			"long desc", "help and example", std::vector<CmdValue>({ CmdValue(&test_chr_sizes_fname, true) }))
+			"long desc", "help and example", std::vector<CmdValue>({ CmdValue(&test_chr_sizes_fname, true) })),
+		CmdOption('a', "annotations-compile", "Create .ann files from a .gtf file.", 
+			"long desc here yada yada", "help and example here", std::vector<CmdValue>({ CmdValue(&compile_annotations_input, true), CmdValue(&compile_annotations_output, true) }))
 	};
 
 	std::string tsv_path, html_path;
@@ -164,7 +170,22 @@ int main(int argc, char ** argv)
 		vcf_loader.createBafFilter(std::cin, vcf_os);
 	}
 
+<<<<<<< HEAD
 	if (tsv_path.size() || test_chr_sizes_fname.size())
+=======
+	if (compile_annotations_input.size())
+	{
+		std::cout << "compiling annotations..." << std::endl;
+		AnnotationData annotations;
+		std::ifstream gtf_is(compile_annotations_input);
+		GtfLoader gtf_loader;
+		gtf_loader.load(annotations, gtf_is);
+		annotations.save(compile_annotations_output);
+		std::cout << "compiled annotations." << std::endl;
+	}
+
+	if (tsv_path.size() || test)
+>>>>>>> a995affda55ed3e2925a8cde23910edf4e1e79a0
 	{
 		GenomeData data;
 
@@ -240,9 +261,9 @@ int main(int argc, char ** argv)
 		if (mkdir((path + "chunks/").c_str(), ALLPERMS) == -1)
 			std::cerr << "ERROR: failed to create a directory." << std::endl;
 
-		std::cout << "saving data..." << std::endl;
+		std::cout << "saving data to " << path << "..." << std::endl;
 		data.save(path, html_path);
-		std::cout << "saved data." << std::endl;
+		std::cout << "saved data to " << path << "." << std::endl;
 	}
 
     return 0;
