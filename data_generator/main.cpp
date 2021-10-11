@@ -198,11 +198,13 @@ int main(int argc, char ** argv)
 
 	if (compile_annotations_input.size())
 	{
+		std::cout << "compiling annotations..." << std::endl;
 		AnnotationData annotations;
 		std::ifstream gtf_is(compile_annotations_input);
 		GtfLoader gtf_loader;
 		gtf_loader.load(annotations, gtf_is);
 		annotations.save(compile_annotations_output);
+		std::cout << "compiled annotations." << std::endl;
 	}
 
 	if (tsv_path.size() || test)

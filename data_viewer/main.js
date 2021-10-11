@@ -657,6 +657,51 @@ window.onload = function () {
 			clip.canvas.height = clip.height;
 			clip.wrapper.appendChild(clip.canvas);
 			clip.chromosomes = {};
+
+			fetch(clip.source + "lookup.json")
+			.then(response => response.json())
+			.then(data => {
+				clip.lookup = data;
+				clip.render_out_of_date = true;
+			});
+
+			clip.tooltip = document.createElement("div");
+			clip.tooltip.classList.add("annotation_tooltip");
+			clip.tooltip.style.display = "none";
+			clip.wrapper.appendChild(clip.tooltip);
+
+			clip.canvas.onpointermove = (ev) => {
+				let hover_position = (ev.clientX - document.body.clientWidth * 0.5) * screen_to_real + focus;
+				if (clip.chromosomes && chr.name in clip.chromosomes) {
+					let transcripts = clip.chromosomes[chr.name];
+					let hovered_indices = [];
+					for (let i = 0; i < transcripts.count; ++i) {
+						if (hover_position >= transcripts.start[i] && hover_position <= transcripts.end[i]) {
+							hovered_indices.push(i);
+						}
+					}
+					if (hovered_indices.length > 0) {
+						clip.tooltip.style.display = "";
+						clip.tooltip.innerHTML = "";
+						clip.tooltip.style.left = ev.clientX + "px";
+						clip.tooltip.style.bottom = "100%";
+						for (const i of hovered_indices) {
+							let string = "";
+							if (transcripts.gene_name[i] < clip.lookup.gene_names.length)
+								string += clip.lookup.gene_names[transcripts.gene_name[i]];
+							if (transcripts.gene_id[i] < 1000000000) { // yikes, need to find better way
+								let s = "00000000000" + transcripts.gene_id[i];
+								string += " ENSG" + s.substr(-11);
+							}
+							let a = document.createElement("a");
+							a.innerHTML = string;
+							clip.tooltip.appendChild(a);
+						}
+					} else {
+						clip.tooltip.style.display = "none";
+					}
+				}
+			};
 		}
 
 		clip.resizer = document.createElement("div");

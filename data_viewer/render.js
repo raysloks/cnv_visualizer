@@ -303,21 +303,21 @@ function render(render_bin_size, repaint) {
 					"rgba(100, 0, 100, 0.25)"
 				];
 				// this is probably really slow
-				for (let i = 0; i < transcripts.length; i += 2) {
-					let screen_pos = (transcripts[i] - focus) / screen_to_real + canvas.width * 0.5;
-					let screen_end = (transcripts[i + 1] - focus) / screen_to_real + canvas.width * 0.5;
+				for (let i = 0; i < transcripts.count; ++i) {
+					let screen_pos = (transcripts.start[i] - focus) / screen_to_real + canvas.width * 0.5;
+					let screen_end = (transcripts.end[i] - focus) / screen_to_real + canvas.width * 0.5;
 					if (screen_pos < canvas.width || screen_end > 0) {
-						ctx.fillStyle = colors[(i / 2) % colors.length];
+						ctx.fillStyle = colors[i % colors.length];
 						ctx.fillRect(screen_pos, 0, screen_end - screen_pos, canvas.height);
 					}
 				}
 			}
-		} else {
+		} else if (clip.lookup) {
 			clip.chromosomes[chr.name] = null;
 
 			// make some copies to prevent reference capturing fuckery
 			let chr_name_locked = chr.name;
-			let clip_locked = clip; // this one might be fine without a copy
+			let clip_locked = clip;
 			
 			fetch(clip.source + chr.name + ".ann")
 			.then(response => {
@@ -331,7 +331,78 @@ function render(render_bin_size, repaint) {
 					return;
 
 				let annotation_count = new Uint32Array(arrayBuffer, 0, 1)[0];
-				clip_locked.chromosomes[chr_name_locked] = new Uint32Array(arrayBuffer, 4, annotation_count * 2);
+				let offset = 8;
+
+				let transcripts = {};
+				transcripts.count = annotation_count;
+
+				for (const data of clip_locked.lookup.data_sets) {
+					offset += 7 - (offset - 1) % 8;
+					switch (data.size) {
+						case 1:
+							transcripts[data.name] = new Uint8Array(arrayBuffer, offset, annotation_count);
+							offset += annotation_count;
+							break;
+						case 2:
+							transcripts[data.name] = new Uint16Array(arrayBuffer, offset, annotation_count);
+							offset += annotation_count * 2;
+							break;
+						case 4:
+							transcripts[data.name] = new Uint32Array(arrayBuffer, offset, annotation_count);
+							offset += annotation_count * 4;
+							break;
+						case 8:
+							transcripts[data.name] = new Uint64Array(arrayBuffer, offset, annotation_count);
+							offset += annotation_count * 8;
+							break;
+					}
+				}
+
+				for (const data of clip_locked.lookup.data_prefixes) {
+					offset += 7 - (offset - 1) % 8;
+					switch (data.size) {
+						case 1:
+							transcripts[data.name] = new Uint8Array(arrayBuffer, offset, annotation_count);
+							offset += annotation_count;
+							break;
+						case 2:
+							transcripts[data.name] = new Uint16Array(arrayBuffer, offset, annotation_count);
+							offset += annotation_count * 2;
+							break;
+						case 4:
+							transcripts[data.name] = new Uint32Array(arrayBuffer, offset, annotation_count);
+							offset += annotation_count * 4;
+							break;
+						case 8:
+							transcripts[data.name] = new Uint64Array(arrayBuffer, offset, annotation_count);
+							offset += annotation_count * 8;
+							break;
+					}
+				}
+
+				for (const data of clip_locked.lookup.data_values) {
+					offset += 7 - (offset - 1) % 8;
+					switch (data.size) {
+						case 1:
+							transcripts[data.name] = new Uint8Array(arrayBuffer, offset, annotation_count);
+							offset += annotation_count;
+							break;
+						case 2:
+							transcripts[data.name] = new Uint16Array(arrayBuffer, offset, annotation_count);
+							offset += annotation_count * 2;
+							break;
+						case 4:
+							transcripts[data.name] = new Uint32Array(arrayBuffer, offset, annotation_count);
+							offset += annotation_count * 4;
+							break;
+						case 8:
+							transcripts[data.name] = new Uint64Array(arrayBuffer, offset, annotation_count);
+							offset += annotation_count * 8;
+							break;
+					}
+				}
+
+				clip_locked.chromosomes[chr_name_locked] = transcripts;
 
 				clip_locked.render_out_of_date = true;
 			});
