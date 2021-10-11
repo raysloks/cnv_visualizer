@@ -18,11 +18,11 @@
 
 std::vector<ChromosomeTemplate> chr_templates;
 
-int load_chr_templates()
+int load_chr_templates(const std::string& fname)
 {
     std::cout << "loading chromosome sizes..." << std::endl;
 
-    std::ifstream f("chrom_sizes38.tsv");
+    std::ifstream f(fname);
 
     if (!f.good())
     {
@@ -47,32 +47,6 @@ int load_chr_templates()
 
 int main(int argc, char ** argv)
 {
-	/* Coal coal(100.0f);
-	std::ofstream os("test.json");
-	coal.printJson(os);
-	return 0; */
-
-	// GenomeData test_data;
-	// test_data.save("../data/subjects/BAB1692-R/vis/");
-	// return 0;
-
-    // if (load_chr_templates())
-    // {
-    //     std::cout << "failed to load chromosome sizes." << std::endl;
-    //     return 1;
-    // }
-
-    // FakeDataGenerator fdg;
-
-    // for (auto& chr : chr_templates)
-    // {
-    //     std::cout << "generating fake chromosome " << chr.name << "..." << std::endl;
-    //     ChromosomeData chr_data = fdg.generateFakeChromosomeData(chr, 100);
-    //     std::cout << "fake chromosome " << chr.name << " generated." << std::endl;
-
-    //     chr_data.save("vscode/data/");
-    // }
-
 	bool help = false;
 
 	std::string create_baf_filter_output;
@@ -84,7 +58,7 @@ int main(int argc, char ** argv)
 
 	std::string bam_fname;
 
-	bool test = false;
+	std::string test_chr_sizes_fname;
 
 	std::vector<CmdOption> options = {
 		CmdOption('h', "help", "Show this text.", 
@@ -96,7 +70,7 @@ int main(int argc, char ** argv)
 		CmdOption('s', "staining", "Add nucleotide base frequency data to final output using a .bam file.", 
 			"long desc", "help and example", std::vector<CmdValue>({ CmdValue(&bam_fname, true) })),
 		CmdOption('t', "test", "Generate fake testing data.", 
-			"long desc", "help and example", std::vector<CmdValue>({ CmdValue(&test) }))
+			"long desc", "help and example", std::vector<CmdValue>({ CmdValue(&test_chr_sizes_fname, true) }))
 	};
 
 	std::string tsv_path, html_path;
@@ -190,7 +164,7 @@ int main(int argc, char ** argv)
 		vcf_loader.createBafFilter(std::cin, vcf_os);
 	}
 
-	if (tsv_path.size() || test)
+	if (tsv_path.size() || test_chr_sizes_fname.size())
 	{
 		GenomeData data;
 
@@ -234,13 +208,31 @@ int main(int argc, char ** argv)
 			});
 		}
 
+		if (test_chr_sizes_fname.size())
+		{
+			if (load_chr_templates(test_chr_sizes_fname))
+				return 1;
+
+			data.chromosomes.resize(chr_templates.size());
+
+			std::cout << "generating fake data..." << std::endl;
+			for (size_t i = 0; i < data.chromosomes.size(); ++i)
+			{
+				threads.emplace_back([&, i]()
+				{
+					FakeDataGenerator fake_data_generator;
+					data.chromosomes[i] = fake_data_generator.generateFakeChromosomeData(chr_templates[i], 100);
+				});
+			}
+		}
+
 		for (auto& thread : threads)
 			thread.join();
 
 		std::string path = tsv_path;
 		path = path.substr(0, path.find_last_of('/'));
 		data.name = path.substr(path.find_last_of('/') + 1);
-		path += "/vis/";
+		path += "vis/";
 
 		std::cout << "creating directories..." << std::endl;
 		if (mkdir(path.c_str(), ALLPERMS) == -1)
