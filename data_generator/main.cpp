@@ -252,10 +252,10 @@ int main(int argc, char ** argv)
 		path += "vis/";
 
 		std::cout << "creating directories..." << std::endl;
-		if (mkdir(path.c_str(), ALLPERMS) == -1)
+		/*if (mkdir(path.c_str(), ALLPERMS) == -1)
 			std::cerr << "ERROR: failed to create a directory." << std::endl;
 		if (mkdir((path + "chunks/").c_str(), ALLPERMS) == -1)
-			std::cerr << "ERROR: failed to create a directory." << std::endl;
+			std::cerr << "ERROR: failed to create a directory." << std::endl;*/
 
 		std::cout << "saving data to " << path << "..." << std::endl;
 		data.save(path, html_path);

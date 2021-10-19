@@ -25,7 +25,7 @@ h1 {
 	margin: 4px;
 }
 
-.canvas_wrapper {
+.clip_wrapper {
 	display: block;
 	float: left;
 	width: 100%;
@@ -52,8 +52,12 @@ h1 {
 	display: block;
 }
 
-canvas {
-	float: left;
+.canvas_wrapper {
+	overflow: hidden;
+	position: absolute;
+	left: 0px;
+	top: 0px;
+	z-index: -3;
 }
 
 .overview_link {
@@ -76,6 +80,7 @@ canvas {
 
 .overview_highlight_overlay {
 	z-index: -2;
+	opacity: 50%;
 }
 
 .overview_link:hover .overview_highlight_overlay {
@@ -155,7 +160,7 @@ select {
 	background-color: white;
 	border: 2px solid black;
 	padding: 10px;
-	z-index: 2;
+	z-index: 3;
 }
 
 .dropdown {

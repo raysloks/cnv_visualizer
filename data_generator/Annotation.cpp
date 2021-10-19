@@ -123,4 +123,5 @@ int Annotation::prepare(const std::vector<std::string>& fields, AnnotationData& 
 		}
 		data.unknown[key] = -1;
 	}
+	return 0;
 }

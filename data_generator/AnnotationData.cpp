@@ -3,6 +3,7 @@
 #include <thread>
 #include <fstream>
 #include <iostream>
+#include <algorithm>
 
 #include "Coal.h"
 
@@ -29,7 +30,7 @@ AnnotationData::AnnotationData()
 #define PRINT_NUM(x) std::cout << #x": " << x << std::endl;
 #define ADD_SET(x) coal[#x] = Coal(std::vector<Coal>()); for (auto& kv : x) coal[#x].elements.push_back(kv.first);
 
-void AnnotationData::save(const std::string& path) const
+void AnnotationData::save(const std::string& path)
 {
 	PRINT_NUM(max_gene_id)
 	PRINT_NUM(max_transcript_id)
@@ -99,7 +100,12 @@ void AnnotationData::save(const std::string& path) const
 
 	std::vector<std::thread> threads;
 	for (auto& chr : annotations)
+	{
 		threads.emplace_back([=]() {
+			auto chr_annotations_copy = chr.second;
+			std::sort(chr_annotations_copy.begin(), chr_annotations_copy.end(), [](const Annotation& a, const Annotation& b) { return a.end - a.start > b.end - b.start; });
+			std::stable_sort(chr_annotations_copy.begin(), chr_annotations_copy.end(), [](const Annotation& a, const Annotation& b) { return a.start < b.start; });
+
 			std::string fp = path + chr.first + ".ann";
 			std::ofstream f(fp, std::ofstream::binary | std::ofstream::trunc);
 
@@ -111,7 +117,7 @@ void AnnotationData::save(const std::string& path) const
 			for (auto& kv : set_map)
 			{
 				size_t offset = 0;
-				for (auto& annotation : chr.second)
+				for (auto& annotation : chr_annotations_copy)
 				{
 					f.write(&(annotation.*kv.second.index), kv.second.index_size);
 					offset += kv.second.index_size;
@@ -121,7 +127,7 @@ void AnnotationData::save(const std::string& path) const
 			for (auto& kv : prefix_map)
 			{
 				size_t offset = 0;
-				for (auto& annotation : chr.second)
+				for (auto& annotation : chr_annotations_copy)
 				{
 					f.write(&(annotation.*kv.second.value), kv.second.value_size);
 					offset += kv.second.value_size;
@@ -131,7 +137,7 @@ void AnnotationData::save(const std::string& path) const
 			for (auto& kv : effective_num_map)
 			{
 				size_t offset = 0;
-				for (auto& annotation : chr.second)
+				for (auto& annotation : chr_annotations_copy)
 				{
 					f.write(&(annotation.*kv.second.value), kv.second.value_size);
 					offset += kv.second.value_size;
@@ -139,6 +145,7 @@ void AnnotationData::save(const std::string& path) const
 				f.write((char*)&dummy, 7 - (offset - 1) % 8);
 			}
 		});
+	}
 	for (auto& thread : threads)
 		thread.join();
 }

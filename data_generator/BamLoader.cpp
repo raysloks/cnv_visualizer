@@ -2,11 +2,16 @@
 
 #include <iostream>
 
+#ifndef HTS_MISSING
 #include <htslib/hts.h>
 #include <htslib/sam.h>
+#endif
 
 int BamLoader::load(GenomeData& data, const std::string& fname)
 {
+
+#ifndef HTS_MISSING
+
 	htsFile * fp = hts_open(fname.c_str(), "r");
 
 	sam_hdr_t * header = sam_hdr_read(fp);
@@ -121,6 +126,8 @@ int BamLoader::load(GenomeData& data, const std::string& fname)
 	sam_hdr_destroy(header);
 
 	hts_close(fp);
+
+#endif
 
 	return 0;
 }

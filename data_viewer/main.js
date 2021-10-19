@@ -16,6 +16,9 @@ let last_chromosome_index = null;
 let last_screen_to_real;
 let last_focus;
 
+let canvas;
+let canvas_wrapper;
+
 let render_out_of_date = true;
 
 let calls;
@@ -144,8 +147,8 @@ function check_update() {
 			if (current_chromosome_dropdown_a.href != hash)
 				current_chromosome_dropdown_a.href = hash;
 			// this is super scuffed
-			let clip = clips.find(e => e.type == "overview" && e.canvases);
-			let current_chromosome_overview_a = clip.canvases[chromosome_index].parentNode;
+			let clip = clips.find(e => e.type == "overview" && e.subclips);
+			let current_chromosome_overview_a = clip.subclips[chromosome_index].render_area.parentNode;
 			if (current_chromosome_overview_a.href != hash) {
 				current_chromosome_overview_a.href = hash;
 			}
@@ -162,7 +165,7 @@ function check_update() {
 			}
 			current_chromosome_overview_a.classList.add("overview_current");
 			if (last_chromosome_index !== chromosome_index && last_chromosome_index !== null) {
-				let last_chromosome_overview_a = clip.canvases[last_chromosome_index].parentNode;
+				let last_chromosome_overview_a = clip.subclips[last_chromosome_index].render_area.parentNode;
 				last_chromosome_overview_a.classList.remove("overview_current");
 			}
 		}
@@ -177,9 +180,9 @@ function check_update() {
 		last_focus = focus;
 		render_out_of_date = false;
 		last_zoom_area_end = zoom_area_end;
-		render(undefined, true);
+		render(true);
 	} else {
-		render(undefined, false);
+		render(false);
 	}
 }
 
@@ -225,7 +228,7 @@ function on_animation_frame(timestamp) {
 	}
 
 	focus = Math.max(chromosome_offsets[chromosome_index], Math.min(chromosome_offsets[chromosome_index] + chromosome_sizes[chromosome_index], focus));
-	screen_to_real = Math.max(base_bin_size / 10, Math.min(max_bin_size * 10, screen_to_real));
+	screen_to_real = Math.max(base_bin_size / 100, Math.min(max_bin_size * 10, screen_to_real));
 
 	window.requestAnimationFrame(on_animation_frame);
 	check_update();
@@ -246,10 +249,10 @@ let clips = [
 					"base_t_density"
 				],
 				colors: [
-					[0.2, 0.0, 0.0],
-					[1.0, 1.0, 0.0],
-					[0.0, 1.0, 0.0],
-					[0.0, 0.0, 0.2]
+					[0.2, 0.0, 0.0, 1.0],
+					[1.0, 1.0, 0.0, 1.0],
+					[0.0, 1.0, 0.0, 1.0],
+					[0.0, 0.0, 0.2, 1.0]
 				],
 				labels: [
 					"A",
@@ -278,10 +281,10 @@ let clips = [
 					"base_t_density"
 				],
 				colors: [
-					[0.2, 0.0, 0.0],
-					[1.0, 1.0, 0.0],
-					[0.0, 1.0, 0.0],
-					[0.0, 0.0, 0.2]
+					[0.2, 0.0, 0.0, 1.0],
+					[1.0, 1.0, 0.0, 1.0],
+					[0.0, 1.0, 0.0, 1.0],
+					[0.0, 0.0, 0.2, 1.0]
 				],
 				labels: [
 					"A",
@@ -334,8 +337,8 @@ let clips = [
 	},
 	{
 		height: 100,
-		type: "transcript",
-		label: "Transcripts",
+		type: "annotation",
+		label: "Ensembl",
 		source: "../../../ensembl/"
 	},
 	{
@@ -348,7 +351,7 @@ let clips = [
 		data: [
 			{
 				key: "coverage_density",
-				fill: "rgba(10, 10, 200, 0.5)"
+				fill: [0.05, 0.05, 0.85, 0.5]
 			}
 		]
 	},
@@ -441,7 +444,7 @@ let clips = [
 			{
 				key: "baf_density",
 				func: value => value / (value + 0.5),
-				fill: "rgba(10, 200, 10, 0.5)"
+				fill: [0.05, 0.85, 0.05, 0.5]
 			}
 		]
 	},
@@ -456,7 +459,7 @@ let clips = [
 			{
 				key: "baf_top_density",
 				func: value => value / (value + 0.5),
-				fill: "rgba(10, 200, 10, 0.5)"
+				fill: [0.05, 0.85, 0.05, 0.5]
 			}
 		]
 	},
@@ -471,7 +474,7 @@ let clips = [
 			{
 				key: "baf_mid_density",
 				func: value => value / (value + 0.5),
-				fill: "rgba(10, 200, 10, 0.5)"
+				fill: [0.05, 0.85, 0.05, 0.5]
 			}
 		]
 	},
@@ -486,7 +489,7 @@ let clips = [
 			{
 				key: "baf_bot_density",
 				func: value => value / (value + 0.5),
-				fill: "rgba(10, 200, 10, 0.5)"
+				fill: [0.05, 0.85, 0.05, 0.5]
 			}
 		]
 	}
@@ -500,7 +503,8 @@ function hex_to_rgb(color) {
 	return [
 		parseInt(color.slice(1, 3), 16),
 		parseInt(color.slice(3, 5), 16),
-		parseInt(color.slice(5, 7), 16)
+		parseInt(color.slice(5, 7), 16),
+		1.0
 	];
 }
 
@@ -524,6 +528,12 @@ window.onload = function () {
 	context_menu_element.style.display = "none";
 	document.body.appendChild(context_menu_element);
 
+	canvas = document.createElement("canvas");
+	canvas_wrapper = document.createElement("div");
+	canvas_wrapper.classList.add("canvas_wrapper");
+	canvas_wrapper.appendChild(canvas);
+	document.body.appendChild(canvas_wrapper);
+
 	document.addEventListener("pointerdown", (ev) => {
 		if (is_parent_recursive(ev.target, context_menu_element) == false) {
 			context_menu_element.style.display = "none";
@@ -533,17 +543,19 @@ window.onload = function () {
 	let views_element = document.getElementById("views");
 	for (let clip of clips) {
 		clip.wrapper = document.createElement("div");
-		clip.wrapper.className = "canvas_wrapper";
+		clip.wrapper.className = "clip_wrapper";
 		views_element.appendChild(clip.wrapper);
 
-		if (clip.type == null) {
-			clip.canvas = document.createElement("canvas");
-			clip.canvas.height = clip.height;
-			clip.canvas.classList.add("canvas_cursor_text");
-			clip.wrapper.appendChild(clip.canvas);
+		clip.rect = {};
 
-			clip.canvas.oncontextmenu = (ev) => {
-				let pos = (ev.clientX - document.body.clientWidth * 0.5) * screen_to_real + focus;
+		if (clip.type == null || clip.type == "annotation") {
+			clip.render_area = document.createElement("div");
+			clip.render_area.style.height = clip.height + "px";
+			clip.render_area.classList.add("canvas_cursor_text");
+			clip.wrapper.appendChild(clip.render_area);
+
+			clip.render_area.oncontextmenu = (ev) => {
+				let pos = (ev.clientX - document.documentElement.clientWidth * 0.5) * screen_to_real + focus;
 				if (calls) {
 					let call_chr = calls.chromosomes[chr.name];
 					if (call_chr) {
@@ -564,47 +576,39 @@ window.onload = function () {
 				}
 			};
 
-			clip.canvas.onpointerdown = (ev) => {
+			clip.render_area.onpointerdown = (ev) => {
 				if (ev.which == 1) {
-					zoom_area_start = (ev.clientX - document.body.clientWidth * 0.5) * screen_to_real + focus;
+					zoom_area_start = (ev.clientX - document.documentElement.clientWidth * 0.5) * screen_to_real + focus;
 					zoom_area_end = zoom_area_start;
 					view_mouse_x = ev.clientX;
-					clip.canvas.setPointerCapture(ev.pointerId);
-					clip.canvas.onpointermove = (ev) => {
-						zoom_area_end = (ev.clientX - document.body.clientWidth * 0.5) * screen_to_real + focus;
-						view_mouse_x = ev.clientX;
-					};
-					clip.canvas.onpointerup = (ev) => {
+					clip.render_area.setPointerCapture(ev.pointerId);
+					clip.render_area.onpointerup = (ev) => {
 						if (ev.which != 1)
 							return;
-						zoom_area_end = (ev.clientX - document.body.clientWidth * 0.5) * screen_to_real + focus;
+						zoom_area_end = (ev.clientX - document.documentElement.clientWidth * 0.5) * screen_to_real + focus;
 						if (Math.abs(zoom_area_end - zoom_area_start) / screen_to_real >= min_zoom_area_width) {
 							perform_zoom(zoom_area_start, zoom_area_end);
 						}
 						zoom_area_start = null;
 						zoom_area_end = null;
-						clip.canvas.releasePointerCapture(ev.pointerId);
-						clip.canvas.onpointermove = null;
-						clip.canvas.onpointerup = null;
+						clip.render_area.releasePointerCapture(ev.pointerId);
+						clip.render_area.onpointerup = null;
 					};
 				}
+			};
+
+			clip.wrapper.onpointerdown = (ev) => {
 				if (ev.which == 2) {
-					let grab_position = (ev.clientX - document.body.clientWidth * 0.5) * screen_to_real + focus;
-					clip.canvas.classList.add("grabbing");
-					clip.canvas.setPointerCapture(ev.pointerId);
-					clip.canvas.onpointermove = (ev) => {
-						let last_focus = focus;
-						focus = grab_position - (ev.clientX - document.body.clientWidth * 0.5) * screen_to_real;
-						if (last_focus != focus)
-							render_out_of_date = true;
-					};
-					clip.canvas.onpointerup = (ev) => {
+					clip.grab_position = (ev.clientX - document.documentElement.clientWidth * 0.5) * screen_to_real + focus;
+					clip.render_area.classList.add("grabbing");
+					clip.render_area.setPointerCapture(ev.pointerId);
+					clip.render_area.onpointerup = (ev) => {
 						if (ev.which != 2)
 							return;
-						clip.canvas.classList.remove("grabbing");
-						clip.canvas.releasePointerCapture(ev.pointerId);
-						clip.canvas.onpointermove = null;
-						clip.canvas.onpointerup = null;
+						clip.render_area.classList.remove("grabbing");
+						clip.render_area.releasePointerCapture(ev.pointerId);
+						clip.grab_position = null;
+						clip.render_area.onpointerup = null;
 
 						// scuffed
 						smooth_zoom_target_focus = focus;
@@ -613,6 +617,90 @@ window.onload = function () {
 					ev.preventDefault();
 				}
 			};
+
+			function pointermove(ev) {
+				let position = (ev.clientX - document.documentElement.clientWidth * 0.5) * screen_to_real + focus;
+				if (zoom_area_start)
+					zoom_area_end = position;
+				view_mouse_x = ev.clientX;
+				if (clip.grab_position != null) {
+					let last_focus = focus;
+					focus = clip.grab_position - (ev.clientX - document.documentElement.clientWidth * 0.5) * screen_to_real;
+					position = (ev.clientX - document.documentElement.clientWidth * 0.5) * screen_to_real + focus;
+					if (last_focus != focus)
+						render_out_of_date = true;
+				}
+				if (clip.type == "annotation") {
+					if (clip.chromosomes && chr.name in clip.chromosomes) {
+						let annotations = clip.chromosomes[chr.name];
+						if (annotations) {
+							let hovered_indices = [];
+							for (let i = 0; i < annotations.count; ++i) {
+								if (position >= annotations.start[i] && position <= annotations.end[i]) {
+									hovered_indices.push(i);
+								}
+							}
+							if (hovered_indices.length > 0) {
+								clip.tooltip.style.display = "";
+								clip.tooltip.innerHTML = "";
+								clip.tooltip.style.left = ev.clientX - 50 + "px";
+								clip.tooltip.style.bottom = "calc(100% - 5px)";
+
+								let gene_names = {};
+
+								for (const i of hovered_indices) {
+									if (annotations.gene_name[i] < clip.lookup.gene_names.length) {
+										gene_names[annotations.gene_id[i]] = clip.lookup.gene_names[annotations.gene_name[i]];
+									}
+								}
+
+								for (const [gene_id, gene_name] of Object.entries(gene_names)) {
+									let tr = document.createElement("tr");
+									
+									let td = document.createElement("td");
+									td.innerHTML = gene_name;
+									tr.appendChild(td);
+
+									td = document.createElement("td");
+									let a = document.createElement("a");
+									let s = "00000000000" + gene_id;
+									s = "ENSG" + s.substr(-11);
+									a.innerHTML = s;
+									a.href = "https://grch37.ensembl.org/Homo_sapiens/Gene/Summary?db=core;g=" + s;
+									a.target = "_blank";
+									td.appendChild(a);
+									tr.appendChild(td);
+
+									clip.tooltip.appendChild(tr);
+								}
+							} else {
+								clip.tooltip.style.display = "none";
+							}
+						}
+					}
+				}
+			}
+			clip.render_area.addEventListener("pointermove", pointermove);
+			
+			if (clip.type == "annotation") {
+				clip.chromosomes = {};
+
+				fetch(clip.source + "lookup.json")
+				.then(response => response.json())
+				.then(data => {
+					clip.lookup = data;
+					clip.render_out_of_date = true;
+				});
+
+				clip.tooltip = document.createElement("table");
+				clip.tooltip.classList.add("annotation_tooltip");
+				clip.tooltip.style.display = "none";
+				clip.wrapper.appendChild(clip.tooltip);
+
+				clip.wrapper.onpointerleave = (ev) => {
+					clip.tooltip.style.display = "none";
+				};
+			}
 		}
 		if (clip.type == "overview") {
 			if (clip.data) {
@@ -620,104 +708,72 @@ window.onload = function () {
 				clip.overview_wrapper.style.marginRight = "50px";
 				clip.wrapper.appendChild(clip.overview_wrapper);
 	
-				clip.canvases = [];
+				clip.subclips = [];
 				let total_size = chromosome_sizes.reduce((a, e) => a + e);
 				for (let i = 0; i < chromosome_sizes.length; ++i) {
+					let subclip = {};
+					subclip.rect = {};
+					clip.subclips.push(subclip);
+
 					let a = document.createElement("a");
 					a.href = "#" + chromosome_names[i];
 					a.classList.add("overview_link");
 					a.style.width = chromosome_sizes[i] / total_size * 100 + "%";
 					clip.overview_wrapper.appendChild(a);
 	
-					let canvas = document.createElement("canvas");
-					canvas.height = clip.height;
-					clip.canvases.push(canvas);
-					a.appendChild(canvas);
-	
+					let render_area = document.createElement("div");
+					render_area.style.height = clip.height + "px";
+					subclip.render_area = render_area;
+					a.appendChild(render_area);
+
 					let overlay = document.createElement("div");
 					overlay.classList.add("overlay");
-					overlay.classList.add("overview_highlight_overlay");
-					overlay.innerText = chromosome_names[i];
 					a.appendChild(overlay);
+	
+					let highlight_overlay = document.createElement("div");
+					highlight_overlay.classList.add("overlay");
+					highlight_overlay.classList.add("overview_highlight_overlay");
+					overlay.appendChild(highlight_overlay);
 	
 					let zoom_overlay = document.createElement("div");
 					zoom_overlay.classList.add("overlay");
 					zoom_overlay.classList.add("overview_zoom_overlay");
 					//zoom_overlay.style.display = "none";
-					a.appendChild(zoom_overlay);
+					overlay.appendChild(zoom_overlay);
+
+					let chr_name_element = document.createElement("div");
+					chr_name_element.innerText = chromosome_names[i];
+					overlay.appendChild(chr_name_element);
 				}
 			} else {
-				clip.canvas = document.createElement("canvas");
-				clip.canvas.height = clip.height;
-				clip.wrapper.appendChild(clip.canvas);
+				clip.render_area = document.createElement("div");
+				clip.render_area.style.height = clip.height + "px";
+				clip.wrapper.appendChild(clip.render_area);
 			}
-		}
-		if (clip.type == "transcript") {
-			clip.canvas = document.createElement("canvas");
-			clip.canvas.height = clip.height;
-			clip.wrapper.appendChild(clip.canvas);
-			clip.chromosomes = {};
-
-			fetch(clip.source + "lookup.json")
-			.then(response => response.json())
-			.then(data => {
-				clip.lookup = data;
-				clip.render_out_of_date = true;
-			});
-
-			clip.tooltip = document.createElement("div");
-			clip.tooltip.classList.add("annotation_tooltip");
-			clip.tooltip.style.display = "none";
-			clip.wrapper.appendChild(clip.tooltip);
-
-			clip.canvas.onpointermove = (ev) => {
-				let hover_position = (ev.clientX - document.body.clientWidth * 0.5) * screen_to_real + focus;
-				if (clip.chromosomes && chr.name in clip.chromosomes) {
-					let transcripts = clip.chromosomes[chr.name];
-					let hovered_indices = [];
-					for (let i = 0; i < transcripts.count; ++i) {
-						if (hover_position >= transcripts.start[i] && hover_position <= transcripts.end[i]) {
-							hovered_indices.push(i);
-						}
-					}
-					if (hovered_indices.length > 0) {
-						clip.tooltip.style.display = "";
-						clip.tooltip.innerHTML = "";
-						clip.tooltip.style.left = ev.clientX + "px";
-						clip.tooltip.style.bottom = "100%";
-						for (const i of hovered_indices) {
-							let string = "";
-							if (transcripts.gene_name[i] < clip.lookup.gene_names.length)
-								string += clip.lookup.gene_names[transcripts.gene_name[i]];
-							if (transcripts.gene_id[i] < 1000000000) { // yikes, need to find better way
-								let s = "00000000000" + transcripts.gene_id[i];
-								string += " ENSG" + s.substr(-11);
-							}
-							let a = document.createElement("a");
-							a.innerHTML = string;
-							clip.tooltip.appendChild(a);
-						}
-					} else {
-						clip.tooltip.style.display = "none";
-					}
-				}
-			};
 		}
 
 		clip.resizer = document.createElement("div");
 		clip.resizer.classList.add("clip_resizer");
 		clip.resizer.onpointerdown = (ev) => {
-			clip.resizer.setPointerCapture(ev.pointerId);
-			clip.resizer.onpointermove = (e) => {
-				let height = Math.round(e.clientY - clip.canvas.getBoundingClientRect().top);
-				if (clip.canvas.height != height)
-					clip.canvas.height = height;
-			};
-			return false;
+			if (ev.which == 1) {
+				clip.resizer.setPointerCapture(ev.pointerId);
+				clip.resizer.onpointermove = (e) => {
+					let height = Math.round(e.clientY - clip.render_area.getBoundingClientRect().top);
+					height = Math.max(0, height);
+					height += "px";
+					if (clip.render_area.style.height != height) {
+						clip.render_area.style.height = height;
+						render_out_of_date = true;
+					}
+				};
+				return false;
+			}
 		};
 		clip.resizer.onpointerup = (ev) => {
-			clip.resizer.releasePointerCapture(ev.pointerId);
-			clip.resizer.onpointermove = null;
+			if (ev.which == 1) {
+				clip.resizer.releasePointerCapture(ev.pointerId);
+				clip.resizer.onpointermove = null;
+			}
 		};
 		clip.wrapper.appendChild(clip.resizer);
 
@@ -763,6 +819,7 @@ window.onload = function () {
 							parent.appendChild(wrappers[i]);
 					}
 					clip.grabber.setPointerCapture(e.pointerId);
+					render_out_of_date = true;
 				}
 				clip.grabber.style.transform = `translateY(calc(${closest_diff}px - 50%))`;
 			};

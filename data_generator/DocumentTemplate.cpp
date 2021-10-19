@@ -151,6 +151,7 @@ int DocumentTemplate::parse(std::ostream& os)
 			}
 		}
 	}
+	return 0;
 }
 
 std::string DocumentTemplate::resolve(std::string token) const

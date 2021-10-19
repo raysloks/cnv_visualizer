@@ -11,7 +11,7 @@ class AnnotationData
 public:
 	AnnotationData();
 
-    void save(const std::string& path) const;
+    void save(const std::string& path);
 
 	std::map<std::string, std::vector<Annotation>> annotations;
 

@@ -1,3 +1,13 @@
+let gl_point_buffers = {};
+let gl_line_buffers = {};
+let gl_area_buffers = {};
+let gl_rectangle_buffers = {};
+let gl_rectangle_buffer;
+
+let gl;
+let shader;
+let color_shader;
+
 function xyz_to_rgb(color) {
 	return [
 		color[0] * 3.2406 + color[1] * -1.5372 + color[2] * -0.4986,
@@ -20,107 +30,200 @@ function amplify_density_values(values, exponent) {
 	return values.map(e => e / sum);
 }
 
-function drawGraph(path, chunks, key, x_off, x_scale, y_off, y_scale, density_key, func) {
+function drawLineGraph(chunks, model_view, proj, key, density_key) {
 
-	let strokes = 0;
-	let x;
-	let y;
+	gl.useProgram(shader.program);
 
-	for (let j = 0; j < chunks.length; ++j) {
-		let data = chunks[j].data[key];
-		if (!data)
+	gl.uniformMatrix4fv(shader.model_view, false, model_view);
+	gl.uniformMatrix4fv(shader.proj, false, proj);
+
+	gl.uniform4fv(shader.color, [0.0, 0.0, 0.0, 1.0]);
+
+	for (let i = 0; i < chunks.length; ++i) {
+		let chunk = chunks[i];
+		if (!(key in chunk.data))
 			return;
-		let density_data;
-		if (density_key !== undefined)
-			density_data = chunks[j].data[density_key];
-		for (let i = 0; i < data.length; ++i) {
-			let value = data[i];
-			if (func)
-				value = func(value);
-			if (density_data)
-				if (density_data[i] == 0) {
-					if (strokes == 1) {
-						path.lineTo(x + 0.5 * x_scale, y);
-						path.lineTo(x - 0.5 * x_scale, y);
-					}
-					strokes = 0;
-					continue;
-				}
-			x = x_off + i * x_scale;
-			y = y_off + value * y_scale;
-			if (strokes > 0)
-				path.lineTo(x, y);
-			else
-				path.moveTo(x, y);
-			++strokes;
-		}
-		x_off += data.length * x_scale;
-	}
+		let graph_id = [chunk.id, key, density_key].join("");
+		if (!(graph_id in gl_line_buffers))
+			gl_line_buffers[graph_id] = chunk.getLineBuffer(gl, key, density_key);
+		gl.bindBuffer(gl.ARRAY_BUFFER, gl_line_buffers[graph_id].buffer);
+		gl.vertexAttribPointer(
+			shader.position,
+			2,
+			gl.FLOAT,
+			false,
+			0,
+			0);
+		gl.enableVertexAttribArray(shader.position);
 
-	return x;
+		if (density_key)
+			gl.drawArrays(gl.LINES, 0, chunk.size * 2);
+		else
+			gl.drawArrays(gl.LINE_STRIP, 0, chunk.size);
+	}
 }
 
-function drawPointGraph(path, chunks, key, x_off, x_scale, y_off, y_scale, density_key, func) {
+function drawAreaGraph(chunks, model_view, proj, color, key, density_key) {
 
-	let x;
-	let y;
+	gl.useProgram(shader.program);
 
-	let point_width = Math.max(1, x_scale);
+	gl.uniformMatrix4fv(shader.model_view, false, model_view);
+	gl.uniformMatrix4fv(shader.proj, false, proj);
 
-	for (let j = 0; j < chunks.length; ++j) {
-		let data = chunks[j].data[key];
-		if (!data)
+	gl.uniform4fv(shader.color, color);
+
+	for (let i = 0; i < chunks.length; ++i) {
+		let chunk = chunks[i];
+		if (!(key in chunk.data))
 			return;
-		let density_data;
-		if (density_key !== undefined)
-			density_data = chunks[j].data[density_key];
-		for (let i = 0; i < data.length; ++i) {
-			let value = data[i];
-			if (func)
-				value = func(value);
-			if (density_data)
-				if (density_data[i] == 0)
-					continue;
-			x = x_off + i * x_scale;
-			y = y_off + value * y_scale;
-			path.moveTo(x, y);
-			path.lineTo(x + point_width, y);
-		}
-		x_off += data.length * x_scale;
-	}
+		let graph_id = [chunk.id, key, density_key].join("");
+		if (!(graph_id in gl_area_buffers))
+			gl_area_buffers[graph_id] = chunk.getAreaBuffer(gl, key, density_key);
+		gl.bindBuffer(gl.ARRAY_BUFFER, gl_area_buffers[graph_id].buffer);
+		gl.vertexAttribPointer(
+			shader.position,
+			2,
+			gl.FLOAT,
+			false,
+			0,
+			0);
+		gl.enableVertexAttribArray(shader.position);
 
-	return x;
+		if (density_key)
+			gl.drawArrays(gl.TRIANGLES, 0, chunk.size * 6);
+		else
+			gl.drawArrays(gl.TRIANGLE_STRIP, 0, chunk.size * 2);
+	}
 }
 
-function drawRectangles(ctx, chunks, keys, colors, x_off, x_scale, y, height, amplification, density_key) {
+function drawPointGraph(chunks, model_view, proj, key, density_key) {
 
-	let x;
+	gl.useProgram(shader.program);
 
-	for (let j = 0; j < chunks.length; ++j) {
-		let data = keys.map(e => chunks[j].data[e]);
-		if (data.some(e => !e))
+	gl.uniformMatrix4fv(shader.model_view, false, model_view);
+	gl.uniformMatrix4fv(shader.proj, false, proj);
+
+	gl.uniform4fv(shader.color, [0.0, 0.0, 0.0, 1.0]);
+
+	for (let i = 0; i < chunks.length; ++i) {
+		let chunk = chunks[i];
+		if (!(key in chunk.data))
 			return;
-		let density_data;
-		if (density_key !== undefined)
-			density_data = chunks[j].data[density_key];
-		for (let i = 0; i < data[0].length; ++i) {
-			let values = data.map(e => e[i]);
-			if (density_data)
-				if (density_data[i] != 0)
-					values = values.map(e => e / density_data[i]);
-				else
-					continue;
-			values = amplify_density_values(values, amplification);
-			let color = colors.map((e, i) => e.map(e => e * values[i]))
-				.reduce((acc, c) => acc.map((e, i) => e + c[i]), [0, 0, 0]);
-			//color = xyz_to_rgb(color);
-			color = rgb_to_srgb(color);
-			color = color.map(e => Math.floor(e * 255));
-			x = x_off + i * x_scale;
-			ctx.fillStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, 1.0)`;
-			ctx.fillRect(x, y, x_scale + 1, height);
-		}
-		x_off += data[0].length * x_scale;
+		let graph_id = [chunk.id, key, density_key].join("");
+		if (!(graph_id in gl_point_buffers))
+			gl_point_buffers[graph_id] = chunk.getPointBuffer(gl, key, density_key);
+		gl.bindBuffer(gl.ARRAY_BUFFER, gl_point_buffers[graph_id].buffer);
+		gl.vertexAttribPointer(
+			shader.position,
+			2,
+			gl.FLOAT,
+			false,
+			0,
+			0);
+		gl.enableVertexAttribArray(shader.position);
+
+		gl.drawArrays(gl.POINTS, 0, chunk.size);
+	}
+
+}
+
+function drawRectangles(chunks, model_view, proj, colors, keys, density_key) {
+
+	gl.useProgram(color_shader.program);
+
+	gl.uniformMatrix4fv(color_shader.model_view, false, model_view);
+	gl.uniformMatrix4fv(color_shader.proj, false, proj);
+
+	gl.uniformMatrix4fv(color_shader.color_modifier, false, colors.flat());
+
+	for (let i = 0; i < chunks.length; ++i) {
+		let chunk = chunks[i];
+		if (keys.some(key => !key in chunk.data))
+			return;
+		let graph_id = [chunk.id, keys, density_key].join("");
+		if (!(graph_id in gl_rectangle_buffers))
+			gl_rectangle_buffers[graph_id] = chunk.getRectangleBuffer(gl, keys, density_key);
+		let buffer = gl_rectangle_buffers[graph_id];
+		gl.bindBuffer(gl.ARRAY_BUFFER, buffer.buffer);
+		gl.vertexAttribPointer(
+			color_shader.position,
+			2,
+			gl.FLOAT,
+			false,
+			0,
+			buffer.offset.position);
+		gl.enableVertexAttribArray(color_shader.position);
+		gl.vertexAttribPointer(
+			color_shader.color,
+			4,
+			gl.UNSIGNED_BYTE,
+			true,
+			0,
+			buffer.offset.color);
+		gl.enableVertexAttribArray(color_shader.color);
+
+		gl.drawArrays(gl.TRIANGLES, 0, buffer.vertex_count);
+	}
+}
+
+function drawRectangle(clip, x, y, w, h, color) {
+
+	if (gl_rectangle_buffer == null)
+		gl_rectangle_buffer = createBuffer(gl, new Float32Array([
+			0.0, 0.0,
+			1.0, 1.0,
+			0.0, 1.0,
+			0.0, 0.0,
+			1.0, 0.0,
+			1.0, 1.0
+		]));
+	
+	gl.useProgram(shader.program);
+
+	const model_view = [
+		1.0, 0.0, 0.0, 0.0,
+		0.0, 1.0, 0.0, 0.0,
+		0.0, 0.0, 1.0, 0.0,
+		0.0, 0.0, 0.0, 1.0
+	];
+
+	const proj = [
+		2.0 * w / clip.rect.w, 0.0, 0.0, 0.0,
+		0.0, 2.0 * h / clip.rect.h, 0.0, 0.0,
+		0.0, 0.0, 1.0, 0.0,
+		2.0 * x / clip.rect.w - 1.0, 2.0 * y / clip.rect.h - 1.0, 0.0, 1.0
+	];
+
+	gl.uniformMatrix4fv(shader.model_view, false, model_view);
+	gl.uniformMatrix4fv(shader.proj, false, proj);
+
+	gl.uniform4fv(shader.color, color);
+
+	gl.bindBuffer(gl.ARRAY_BUFFER, gl_rectangle_buffer.buffer);
+	gl.vertexAttribPointer(
+		shader.position,
+		2,
+		gl.FLOAT,
+		false,
+		0,
+		0);
+	gl.enableVertexAttribArray(shader.position);
+
+	gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+}
+
+function drawZoomArea(clip) {
+	if (zoom_area_start) {
+		let zoom_area_screen_start = (zoom_area_start - focus) / screen_to_real + clip.rect.w * 0.5;
+		let zoom_area_screen_end = view_mouse_x;
+		let zoom_area_screen_left = Math.min(zoom_area_screen_start, zoom_area_screen_end);
+		let zoom_area_screen_right = Math.max(zoom_area_screen_start, zoom_area_screen_end);
+		let zoom_area_screen_width = zoom_area_screen_right - zoom_area_screen_left;
+		let color = [0.4, 0.4, 0.8, 0.5];
+		if (zoom_area_screen_width < min_zoom_area_width)
+			color = [0.2, 0.2, 0.4, 0.25];
+		drawRectangle(clip, zoom_area_screen_left, 0, zoom_area_screen_width, clip.rect.h, color);
 	}
 }
 
@@ -163,96 +266,301 @@ function getVisibleChunks(minimum_bin_size, left, right) {
 	return [visible_chunks, bin_size];
 }
 
-function render(render_bin_size, repaint) {
+function initContext() {
 
+	gl = canvas.getContext("webgl");
+
+	const vert_source = `
+		attribute vec4 position;
+		uniform mat4 model_view;
+		uniform mat4 proj;
+
+		void main() {
+			gl_Position = proj * model_view * position;
+			gl_PointSize = 1.0;
+		}
+	`;
+
+	const frag_source = `
+		uniform lowp vec4 color;
+
+		void main() {
+			gl_FragColor = color;
+		}
+	`;
+
+	const color_vert_source = `
+		uniform mat4 model_view;
+		uniform mat4 proj;
+		uniform mat4 color_modifier;
+
+		attribute vec4 position;
+		attribute vec4 color;
+
+		varying lowp vec4 v_color;
+
+		void main() {
+			gl_Position = proj * model_view * position;
+			gl_PointSize = 1.0;
+			v_color = color_modifier * color;
+		}
+	`;
+
+	const color_frag_source = `
+		varying lowp vec4 v_color;
+
+		void main() {
+			gl_FragColor = v_color;
+		}
+	`;
+	
+	if (shader == null)
+		shader = new Shader(gl, vert_source, frag_source, [
+			"position"
+		], [
+			"model_view",
+			"proj",
+			"color"
+		]);
+	if (color_shader == null)
+		color_shader = new Shader(gl, color_vert_source, color_frag_source, [
+			"position",
+			"color"
+		], [
+			"model_view",
+			"proj",
+			"color_modifier"
+		]);
+}
+
+function render(repaint) {
+
+	initContext();
+
+	let rect = document.documentElement.getBoundingClientRect();
+	canvas_wrapper.style.width = rect.width + "px";
+	canvas_wrapper.style.height = rect.height + "px";
+	if (canvas.width < rect.width || 
+		canvas.height < rect.height) {
+		repaint = true;
+		canvas.width = rect.width;
+		canvas.height = rect.height;
+	}
+
+	if (repaint) {
+		console.log("REPAINT");
+	}
+
+	// if (false)
 	{
 		let overview_clips = clips.filter(e => e.type == "overview");
 		for (let clip of overview_clips) {
-			if (clip.canvases) {
-				for (let i = 0; i < clip.canvases.length; ++i) {
-					let canvas = clip.canvases[i];
-					if (canvas.width != canvas.parentElement.clientWidth) {
-			
-						let max_chunk_index = Math.floor(chromosome_sizes[i] / (chunk_size * max_bin_size));
-						let chunks = [];
-						for (let j = 0; j <= max_chunk_index; ++j) {
-							chunks.push(get_chunk(chromosome_names[i], max_bin_size, j));
-						}
-						
-						if (chunks.some(e => e === null))
-							continue;
-		
-						canvas.width = canvas.parentElement.clientWidth;
-		
-						let data = clip.data[0];
-		
-						let ctx = canvas.getContext("2d");
-				
-						ctx.setTransform(1, 0, 0, 1, 0, 0);
-						ctx.clearRect(0, 0, canvas.width, canvas.height);
-			
-						drawRectangles(ctx, chunks, data.keys, data.colors, canvas.width * (0.5 - 0.5 / initial_view_margin), max_bin_size / chromosome_sizes[i] * canvas.width / initial_view_margin, 30, 20, data.amplification, data.density_key);
-		
+			if (clip.subclips) {
+				for (let i = 0; i < clip.subclips.length; ++i) {
+					let subclip = clip.subclips[i];
+					let data = clip.data[0];
+
+					let repaint_clip = repaint;
+
+					let rect = subclip.render_area.getBoundingClientRect();
+					rect.y += window.scrollY;
+
+					if (subclip.rect.x != rect.x || 
+						subclip.rect.y != rect.y || 
+						subclip.rect.w != rect.width || 
+						subclip.rect.h != rect.height) {
+						repaint_clip = true;
+						subclip.rect.x = rect.x;
+						subclip.rect.y = rect.y;
+						subclip.rect.w = rect.width;
+						subclip.rect.h = rect.height;
 					}
+
+					if (subclip.render_out_of_date) {
+						repaint_clip = true;
+						subclip.render_out_of_date = false;
+					}		
+
+					if (repaint_clip === false) {
+						continue;
+					}
+
+					gl.enable(gl.SCISSOR_TEST);
+	
+					gl.viewport(subclip.rect.x, canvas.height - subclip.rect.y - subclip.rect.h, subclip.rect.w, subclip.rect.h);
+					gl.scissor(subclip.rect.x, canvas.height - subclip.rect.y - subclip.rect.h, subclip.rect.w, subclip.rect.h);
+					gl.clearColor(1.0, 1.0, 1.0, 1.0);
+					gl.clear(gl.COLOR_BUFFER_BIT);
+	
+					gl.enable(gl.BLEND);
+					gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+					max_chunk_index = Math.floor(chromosome_sizes[i] / (chunk_size * max_bin_size));
+					let chunks = [];
+					for (let j = 0; j <= max_chunk_index; ++j) {
+						chunks.push(get_chunk(chromosome_names[i], max_bin_size, j));
+					}
+					
+					if (chunks.some(e => e === null))
+						continue;
+
+					const model_view = [
+						1.0, 0.0, 0.0, 0.0,
+						0.0, 1.0, 0.0, 0.0,
+						0.0, 0.0, 1.0, 0.0,
+						-chromosome_sizes[i] * 0.5, 0.0, 0.0, 1.0
+					];
+		
+					const proj = [
+						2.0 / chromosome_sizes[i] / initial_view_margin, 0.0, 0.0, 0.0,
+						0.0, 2.0, 0.0, 0.0,
+						0.0, 0.0, 1.0, 0.0,
+						0.0, -1.0, 0.0, 1.0
+					];
+		
+					drawRectangles(chunks, model_view, proj, data.colors, data.keys, data.density_key);
 				}
 			}
-			if (clip.canvas) {
+			if (clip.render_area) {
 
-				let current_chromosome_overview_a = overview_clips.find(e => e.canvases).canvases[chromosome_index].parentNode;
+				let current_chromosome_overview_a = overview_clips.find(e => e.subclips).subclips[chromosome_index].render_area.parentNode;
 				let zoom_overlay = current_chromosome_overview_a.querySelector(".overview_zoom_overlay");
-				
-				let rect = zoom_overlay.getBoundingClientRect();
+				let zoom_rect = zoom_overlay.getBoundingClientRect();
 				
 				let repaint_clip = repaint;
 
-				if (clip.left !== rect.left || clip.right !== rect.right) {
-					clip.left = rect.left;
-					clip.right = rect.right;
+				let rect = clip.render_area.getBoundingClientRect();
+				rect.y += window.scrollY;
+
+				if (clip.rect.x != rect.x || 
+					clip.rect.y != rect.y || 
+					clip.rect.w != rect.width || 
+					clip.rect.h != rect.height) {
 					repaint_clip = true;
+					clip.rect.x = rect.x;
+					clip.rect.y = rect.y;
+					clip.rect.w = rect.width;
+					clip.rect.h = rect.height;
 				}
 
-				let canvas = clip.canvas;
-
-				if (canvas.width != document.body.clientWidth || clip.height != canvas.height) {
-					canvas.width = document.body.clientWidth;
-					clip.height = canvas.height;
+				if (clip.render_out_of_date) {
 					repaint_clip = true;
+					clip.render_out_of_date = false;
 				}
 
-				if (repaint_clip) {
-					let ctx = canvas.getContext("2d");
-
-					ctx.setTransform(1, 0, 0, 1, 0, 0);
-					ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-					// if (zoom_area_start) {
-					// 	let zoom_area_screen_start = (zoom_area_start - focus) / screen_to_real + canvas.width * 0.5;
-					// 	let zoom_area_screen_end = view_mouse_x;
-					// 	let zoom_area_screen_left = Math.min(zoom_area_screen_start, zoom_area_screen_end);
-					// 	let zoom_area_screen_right = Math.max(zoom_area_screen_start, zoom_area_screen_end);
-					// 	let zoom_area_screen_width = zoom_area_screen_right - zoom_area_screen_left;
-					// 	ctx.fillStyle = "rgba(100, 100, 240, 0.5)";
-					// 	if (zoom_area_screen_width < min_zoom_area_width)
-					// 		ctx.fillStyle = "rgba(100, 100, 240, 0.25)";
-					// 	let zoom_area_overview_left = rect.left + zoom_area_screen_left / canvas.width * rect.width;
-					// 	let zoom_area_overview_right = rect.left + zoom_area_screen_right / canvas.width * rect.width;
-
-					// 	ctx.beginPath();
-					// 	ctx.moveTo(zoom_area_screen_left, canvas.height);
-					// 	ctx.lineTo(zoom_area_overview_left, 0);
-					// 	ctx.lineTo(zoom_area_overview_right, 0);
-					// 	ctx.lineTo(zoom_area_screen_right, canvas.height);
-					// 	ctx.fill();
-					// }
-
-					ctx.lineWidth = 2;
-					ctx.beginPath();
-					ctx.moveTo(0, canvas.height);
-					ctx.lineTo(rect.left, 0);
-					ctx.moveTo(canvas.width, canvas.height);
-					ctx.lineTo(rect.right, 0);
-					ctx.stroke();
+				if (repaint_clip === false) {
+					continue;
 				}
+
+				gl.enable(gl.SCISSOR_TEST);
+
+				gl.viewport(clip.rect.x, canvas.height - clip.rect.y - clip.rect.h, clip.rect.w, clip.rect.h);
+				gl.scissor(clip.rect.x, canvas.height - clip.rect.y - clip.rect.h, clip.rect.w, clip.rect.h);
+				gl.clearColor(1.0, 1.0, 1.0, 1.0);
+				gl.clear(gl.COLOR_BUFFER_BIT);
+
+				gl.enable(gl.BLEND);
+				gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+				const line_width_left = 2.0 / Math.cos(Math.PI / 2.0 - Math.atan(rect.height / zoom_rect.left));
+				const line_width_right = 2.0 / Math.cos(Math.PI / 2.0 - Math.atan(rect.height / (rect.right - zoom_rect.right)));
+				let buffer_data = new Float32Array([
+					-line_width_left,
+					0.0,
+					0.0,
+					0.0,
+					zoom_rect.left - line_width_left,
+					rect.height,
+					0.0,
+					0.0,
+					zoom_rect.left,
+					rect.height,
+					zoom_rect.left - line_width_left,
+					rect.height,
+					rect.right,
+					0.0,
+					rect.right + line_width_right,
+					0.0,
+					zoom_rect.right,
+					rect.height,
+					rect.right + line_width_right,
+					0.0,
+					zoom_rect.right + line_width_right,
+					rect.height,
+					zoom_rect.right,
+					rect.height
+				]);
+
+				if (clip.gl_zoom_lines_buffer == null)
+					clip.gl_zoom_lines_buffer = createDynamicBuffer(gl, buffer_data);
+				else
+					updateDynamicBuffer(gl, clip.gl_zoom_lines_buffer, buffer_data);
+	
+				gl.useProgram(shader.program);
+			
+				const model_view = [
+					1.0, 0.0, 0.0, 0.0,
+					0.0, 1.0, 0.0, 0.0,
+					0.0, 0.0, 1.0, 0.0,
+					0.0, 0.0, 0.0, 1.0
+				];
+			
+				const proj = [
+					2.0 / clip.rect.w, 0.0, 0.0, 0.0,
+					0.0, 2.0 / clip.rect.h, 0.0, 0.0,
+					0.0, 0.0, 1.0, 0.0,
+					-1.0, -1.0, 0.0, 1.0
+				];
+			
+				gl.uniformMatrix4fv(shader.model_view, false, model_view);
+				gl.uniformMatrix4fv(shader.proj, false, proj);
+			
+				gl.uniform4fv(shader.color, [0, 0, 0, 1]);
+			
+				gl.bindBuffer(gl.ARRAY_BUFFER, clip.gl_zoom_lines_buffer.buffer);
+				gl.vertexAttribPointer(
+					shader.position,
+					2,
+					gl.FLOAT,
+					false,
+					0,
+					0);
+				gl.enableVertexAttribArray(shader.position);
+			
+				gl.drawArrays(gl.TRIANGLES, 0, 12);
+				
+				// let ctx = canvas.getContext("2d");
+
+				// ctx.setTransform(1, 0, 0, 1, 0, 0);
+				// ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+				// if (zoom_area_start) {
+				// 	let zoom_area_screen_start = (zoom_area_start - focus) / screen_to_real + canvas.width * 0.5;
+				// 	let zoom_area_screen_end = view_mouse_x;
+				// 	let zoom_area_screen_left = Math.min(zoom_area_screen_start, zoom_area_screen_end);
+				// 	let zoom_area_screen_right = Math.max(zoom_area_screen_start, zoom_area_screen_end);
+				// 	let zoom_area_screen_width = zoom_area_screen_right - zoom_area_screen_left;
+				// 	ctx.fillStyle = "rgba(100, 100, 240, 0.5)";
+				// 	if (zoom_area_screen_width < min_zoom_area_width)
+				// 		ctx.fillStyle = "rgba(100, 100, 240, 0.25)";
+				// 	let zoom_area_overview_left = rect.left + zoom_area_screen_left / canvas.width * rect.width;
+				// 	let zoom_area_overview_right = rect.left + zoom_area_screen_right / canvas.width * rect.width;
+
+				// 	ctx.beginPath();
+				// 	ctx.moveTo(zoom_area_screen_left, canvas.height);
+				// 	ctx.lineTo(zoom_area_overview_left, 0);
+				// 	ctx.lineTo(zoom_area_overview_right, 0);
+				// 	ctx.lineTo(zoom_area_screen_right, canvas.height);
+				// 	ctx.fill();
+				// }
+
+				// ctx.lineWidth = 2;
+				// ctx.beginPath();
+				// ctx.moveTo(0, canvas.height);
+				// ctx.lineTo(rect.left, 0);
+				// ctx.moveTo(canvas.width, canvas.height);
+				// ctx.lineTo(rect.right, 0);
+				// ctx.stroke();
 			}
 		}
 	}
@@ -260,57 +568,83 @@ function render(render_bin_size, repaint) {
 	let half_size = screen_to_real * document.body.clientWidth * 0.5;
 	let [visible_chunks, bin_size] = getVisibleChunks(screen_to_real * resolution_modifier, focus - half_size, focus + half_size);
 
-	let transcript_clips = clips.filter(e => e.type == "transcript");
-	for (const clip of transcript_clips) {
-	
-		let canvas = clip.canvas;
+	let annotation_clips = clips.filter(e => e.type == "annotation");
+	for (const clip of annotation_clips) {
 
 		let repaint_clip = repaint;
 
-		if (canvas.width != document.body.clientWidth) {
-			canvas.width = document.body.clientWidth;
-			repaint_clip = true;
-		}
+		let rect = clip.render_area.getBoundingClientRect();
+		rect.y += window.scrollY;
 
-		if (clip.height != canvas.height) {
-			clip.height = canvas.height;
+		if (clip.rect.x != rect.x || 
+			clip.rect.y != rect.y || 
+			clip.rect.w != rect.width || 
+			clip.rect.h != rect.height) {
 			repaint_clip = true;
+			clip.rect.x = rect.x;
+			clip.rect.y = rect.y;
+			clip.rect.w = rect.width;
+			clip.rect.h = rect.height;
 		}
 
 		if (clip.render_out_of_date) {
-			clip.render_out_of_date = false;
 			repaint_clip = true;
+			clip.render_out_of_date = false;
 		}
 
 		if (repaint_clip === false) {
 			continue;
 		}
 
-		let ctx = canvas.getContext("2d");
+		gl.enable(gl.SCISSOR_TEST);
 
-		ctx.setTransform(1, 0, 0, 1, 0, 0);
-		ctx.clearRect(0, 0, canvas.width, canvas.height);
+		gl.viewport(clip.rect.x, canvas.height - clip.rect.y - clip.rect.h, clip.rect.w, clip.rect.h);
+		gl.scissor(clip.rect.x, canvas.height - clip.rect.y - clip.rect.h, clip.rect.w, clip.rect.h);
+		gl.clearColor(1.0, 1.0, 1.0, 1.0);
+		gl.clear(gl.COLOR_BUFFER_BIT);
+
+		gl.enable(gl.BLEND);
+		gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 		
 		if (chr.name in clip.chromosomes) {
-			let transcripts = clip.chromosomes[chr.name];
-			if (transcripts) {
-				let colors = [
-					"rgba(200, 0, 0, 0.25)",
-					"rgba(100, 100, 0, 0.25)",
-					"rgba(0, 200, 0, 0.25)",
-					"rgba(0, 100, 100, 0.25)",
-					"rgba(0, 0, 200, 0.25)",
-					"rgba(100, 0, 100, 0.25)"
+			let annotations = clip.chromosomes[chr.name];
+			if (annotations) {
+
+				if (annotations.gl_buffer == null)
+					annotations.gl_buffer = createBuffer(gl, annotations.gl_buffer_data);
+
+				gl.bindBuffer(gl.ARRAY_BUFFER, annotations.gl_buffer.buffer);
+				gl.vertexAttribPointer(
+					shader.position,
+					2,
+					gl.FLOAT,
+					false,
+					0,
+					0);
+				gl.enableVertexAttribArray(shader.position);
+
+				gl.useProgram(shader.program);
+
+				const model_view = [
+					1.0, 0.0, 0.0, 0.0,
+					0.0, 1.0, 0.0, 0.0,
+					0.0, 0.0, 1.0, 0.0,
+					-focus, 0.0, 0.0, 1.0
 				];
-				// this is probably really slow
-				for (let i = 0; i < transcripts.count; ++i) {
-					let screen_pos = (transcripts.start[i] - focus) / screen_to_real + canvas.width * 0.5;
-					let screen_end = (transcripts.end[i] - focus) / screen_to_real + canvas.width * 0.5;
-					if (screen_pos < canvas.width || screen_end > 0) {
-						ctx.fillStyle = colors[i % colors.length];
-						ctx.fillRect(screen_pos, 0, screen_end - screen_pos, canvas.height);
-					}
-				}
+
+				const proj = [
+					2.0 / clip.rect.w / screen_to_real, 0.0, 0.0, 0.0,
+					0.0, -2.0 * 10.0 / clip.rect.h, 0.0, 0.0,
+					0.0, 0.0, 1.0, 0.0,
+					0.0, 1.0, 0.0, 1.0
+				];
+
+				gl.uniformMatrix4fv(shader.model_view, false, model_view);
+				gl.uniformMatrix4fv(shader.proj, false, proj);
+
+				gl.uniform4fv(shader.color, [0.0, 0.0, 0.0, 0.5]);
+
+				gl.drawArrays(gl.TRIANGLES, 0, 2 * 3 * annotations.count);
 			}
 		} else if (clip.lookup) {
 			clip.chromosomes[chr.name] = null;
@@ -333,27 +667,23 @@ function render(render_bin_size, repaint) {
 				let annotation_count = new Uint32Array(arrayBuffer, 0, 1)[0];
 				let offset = 8;
 
-				let transcripts = {};
-				transcripts.count = annotation_count;
+				let annotations = {};
+				annotations.count = annotation_count;
 
 				for (const data of clip_locked.lookup.data_sets) {
 					offset += 7 - (offset - 1) % 8;
 					switch (data.size) {
 						case 1:
-							transcripts[data.name] = new Uint8Array(arrayBuffer, offset, annotation_count);
+							annotations[data.name] = new Uint8Array(arrayBuffer, offset, annotation_count);
 							offset += annotation_count;
 							break;
 						case 2:
-							transcripts[data.name] = new Uint16Array(arrayBuffer, offset, annotation_count);
+							annotations[data.name] = new Uint16Array(arrayBuffer, offset, annotation_count);
 							offset += annotation_count * 2;
 							break;
 						case 4:
-							transcripts[data.name] = new Uint32Array(arrayBuffer, offset, annotation_count);
+							annotations[data.name] = new Uint32Array(arrayBuffer, offset, annotation_count);
 							offset += annotation_count * 4;
-							break;
-						case 8:
-							transcripts[data.name] = new Uint64Array(arrayBuffer, offset, annotation_count);
-							offset += annotation_count * 8;
 							break;
 					}
 				}
@@ -362,20 +692,16 @@ function render(render_bin_size, repaint) {
 					offset += 7 - (offset - 1) % 8;
 					switch (data.size) {
 						case 1:
-							transcripts[data.name] = new Uint8Array(arrayBuffer, offset, annotation_count);
+							annotations[data.name] = new Uint8Array(arrayBuffer, offset, annotation_count);
 							offset += annotation_count;
 							break;
 						case 2:
-							transcripts[data.name] = new Uint16Array(arrayBuffer, offset, annotation_count);
+							annotations[data.name] = new Uint16Array(arrayBuffer, offset, annotation_count);
 							offset += annotation_count * 2;
 							break;
 						case 4:
-							transcripts[data.name] = new Uint32Array(arrayBuffer, offset, annotation_count);
+							annotations[data.name] = new Uint32Array(arrayBuffer, offset, annotation_count);
 							offset += annotation_count * 4;
-							break;
-						case 8:
-							transcripts[data.name] = new Uint64Array(arrayBuffer, offset, annotation_count);
-							offset += annotation_count * 8;
 							break;
 					}
 				}
@@ -384,96 +710,157 @@ function render(render_bin_size, repaint) {
 					offset += 7 - (offset - 1) % 8;
 					switch (data.size) {
 						case 1:
-							transcripts[data.name] = new Uint8Array(arrayBuffer, offset, annotation_count);
+							annotations[data.name] = new Uint8Array(arrayBuffer, offset, annotation_count);
 							offset += annotation_count;
 							break;
 						case 2:
-							transcripts[data.name] = new Uint16Array(arrayBuffer, offset, annotation_count);
+							annotations[data.name] = new Uint16Array(arrayBuffer, offset, annotation_count);
 							offset += annotation_count * 2;
 							break;
 						case 4:
-							transcripts[data.name] = new Uint32Array(arrayBuffer, offset, annotation_count);
+							annotations[data.name] = new Uint32Array(arrayBuffer, offset, annotation_count);
 							offset += annotation_count * 4;
-							break;
-						case 8:
-							transcripts[data.name] = new Uint64Array(arrayBuffer, offset, annotation_count);
-							offset += annotation_count * 8;
 							break;
 					}
 				}
 
-				clip_locked.chromosomes[chr_name_locked] = transcripts;
+				let stack = [];
 
-				clip_locked.render_out_of_date = true;
+				const stride = 2 * 3 * 2;
+				annotations.gl_buffer_data = new Float32Array(stride * annotations.count);
+				
+				for (let i = 0; i < annotations.count; ++i) {
+
+					if (stack.some(e => annotations.start[i] == annotations.start[e] && annotations.end[i] == annotations.end[e]))
+						continue;
+
+					for (let j = 0; j < stack.length; ++j) {
+						if (stack[j] != null && annotations.end[stack[j]] < annotations.start[i])
+							stack[j] = null;
+					}
+
+					let height_order = stack.findIndex(e => e == null);
+					if (height_order == -1) {
+						height_order = stack.length;
+						stack.push(i);
+					} else {
+						stack[height_order] = i;
+					}
+
+					const margin = 0.06125;
+
+					const top = height_order + margin;
+					const bottom = height_order + 1.0 - margin;
+
+					annotations.gl_buffer_data[i * stride] = annotations.start[i];
+					annotations.gl_buffer_data[i * stride + 1] = top;
+					annotations.gl_buffer_data[i * stride + 2] = annotations.start[i];
+					annotations.gl_buffer_data[i * stride + 3] = bottom;
+					annotations.gl_buffer_data[i * stride + 4] = annotations.end[i] + 1;
+					annotations.gl_buffer_data[i * stride + 5] = top;
+
+					annotations.gl_buffer_data[i * stride + 6] = annotations.end[i] + 1;
+					annotations.gl_buffer_data[i * stride + 7] = top;
+					annotations.gl_buffer_data[i * stride + 8] = annotations.end[i] + 1;
+					annotations.gl_buffer_data[i * stride + 9] = bottom;
+					annotations.gl_buffer_data[i * stride + 10] = annotations.start[i];
+					annotations.gl_buffer_data[i * stride + 11] = bottom;
+				}
+
+				clip_locked.chromosomes[chr_name_locked] = annotations;
+
+				// clip_locked.render_out_of_date = true;
+				render_out_of_date = true;
 			});
 		}
+	
+		drawZoomArea(clip);
 	}
 
 	let chromosome_clips = clips.filter(e => e.type == null);
 	if (visible_chunks) {
 		for (const clip of chromosome_clips) {
 	
-			let x_start = (visible_chunks[0].offset - focus) / screen_to_real + document.body.clientWidth * 0.5;
-	
-			let canvas = clip.canvas;
-	
 			let repaint_clip = repaint;
+
+			let rect = clip.render_area.getBoundingClientRect();
+			rect.y += window.scrollY;
 	
-			if (canvas.width != document.body.clientWidth) {
-				canvas.width = document.body.clientWidth;
+			if (clip.rect.x != rect.x || 
+				clip.rect.y != rect.y || 
+				clip.rect.w != rect.width || 
+				clip.rect.h != rect.height) {
 				repaint_clip = true;
-			}
-	
-			if (clip.height != canvas.height) {
-				clip.height = canvas.height;
-				repaint_clip = true;
+				clip.rect.x = rect.x;
+				clip.rect.y = rect.y;
+				clip.rect.w = rect.width;
+				clip.rect.h = rect.height;
 			}
 	
 			if (clip.render_out_of_date) {
-				clip.render_out_of_date = false;
 				repaint_clip = true;
+				clip.render_out_of_date = false;
 			}
 	
 			if (repaint_clip === false) {
 				continue;
 			}
 	
-			let ctx = canvas.getContext("2d");
+			gl.enable(gl.SCISSOR_TEST);
+
+			gl.viewport(clip.rect.x, canvas.height - clip.rect.y - clip.rect.h, clip.rect.w, clip.rect.h);
+			gl.scissor(clip.rect.x, canvas.height - clip.rect.y - clip.rect.h, clip.rect.w, clip.rect.h);
+			gl.clearColor(1.0, 1.0, 1.0, 1.0);
+			gl.clear(gl.COLOR_BUFFER_BIT);
 	
-			ctx.setTransform(1, 0, 0, 1, 0, 0);
-			ctx.clearRect(0, 0, canvas.width, canvas.height);
-	
+			gl.enable(gl.BLEND);
+			gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
 			if (calls) {
 				if (chr.name in calls.chromosomes) {
 					for (const record of calls.chromosomes[chr.name].records) {
 						let screen_pos = (record.pos - focus) / screen_to_real + canvas.width * 0.5;
 						let screen_end = (record.info["END"] - focus) / screen_to_real + canvas.width * 0.5;
-						if (record.alt == "<DEL>")
-							ctx.fillStyle = "rgba(200, 10, 10, 0.25)";
-						if (record.alt == "<DUP>")
-							ctx.fillStyle = "rgba(10, 200, 10, 0.25)";
-						ctx.fillRect(screen_pos, 0, screen_end - screen_pos, canvas.height);
+						// if (record.alt == "<DEL>")
+						// 	ctx.fillStyle = "rgba(200, 10, 10, 0.25)";
+						// if (record.alt == "<DUP>")
+						// 	ctx.fillStyle = "rgba(10, 200, 10, 0.25)";
+						// ctx.fillRect(screen_pos, 0, screen_end - screen_pos, canvas.height);
 					}
 				}
 			}
 	
-			let top = (clip.view?.top_base ?? clip.height) + (clip.view?.top_scaling ?? 0) * clip.height;
-			let bot = (clip.view?.bot_base ?? 0) + (clip.view?.bot_scaling ?? 0) * clip.height;
+			let top = (clip.view?.top_base ?? 1.0) + (clip.view?.top_scaling ?? 0) * clip.rect.h;
+			let bot = (clip.view?.bot_base ?? 0) + (clip.view?.bot_scaling ?? 0) * clip.rect.h;
 	
-			let scale = canvas.height / (bot - top);
-			let offset = -top * scale;
+			let scale = 2.0 / (top - bot);
+			let offset = -(top + bot) / 2.0;
+
+			const model_view = [
+				1.0, 0.0, 0.0, 0.0,
+				0.0, 1.0, 0.0, 0.0,
+				0.0, 0.0, 1.0, 0.0,
+				-focus, offset, 0.0, 1.0
+			];
+
+			const proj = [
+				2.0 / clip.rect.w / screen_to_real, 0.0, 0.0, 0.0,
+				0.0, scale, 0.0, 0.0,
+				0.0, 0.0, 1.0, 0.0,
+				0.0, 0.0, 0.0, 1.0
+			];
 	
 			if (clip.lines) {
 				for (const line of clip.lines) {
-					ctx.save();
-					if (line.style)
-						ctx.strokeStyle = line.style;
-					ctx.beginPath();
-					let y = line.y * scale + offset;
-					ctx.moveTo(0, y);
-					ctx.lineTo(canvas.width, y);
-					ctx.stroke();
-					ctx.restore();
+					// ctx.save();
+					// if (line.style)
+					// 	ctx.strokeStyle = line.style;
+					// ctx.beginPath();
+					// let y = line.y * scale + offset;
+					// ctx.moveTo(0, y);
+					// ctx.lineTo(canvas.width, y);
+					// ctx.stroke();
+					// ctx.restore();
 				}
 			}
 	
@@ -481,37 +868,19 @@ function render(render_bin_size, repaint) {
 				if (data.key) {
 					if (data.point_mod) {
 						let [visible_chunks, bin_size] = getVisibleChunks(screen_to_real * resolution_modifier * data.point_mod, focus - half_size, focus + half_size);
-						let x_start = (visible_chunks[0].offset - focus) / screen_to_real + document.body.clientWidth * 0.5;
-						data.path = new Path2D();
-						drawPointGraph(data.path, visible_chunks, data.key, x_start, bin_size / screen_to_real, offset, scale, data.density_key, data.func);
-						ctx.stroke(data.path);
+						drawPointGraph(visible_chunks, model_view, proj, data.key, data.density_key);
 					} else {
-						data.path = new Path2D();
-						let x_end = drawGraph(data.path, visible_chunks, data.key, x_start, bin_size / screen_to_real, offset, scale, data.density_key, data.func);
-						ctx.stroke(data.path);
+						drawLineGraph(visible_chunks, model_view, proj, data.key, data.density_key);
 						if (data.fill) {
-							ctx.fillStyle = data.fill;
-							data.path.lineTo(x_end, offset);
-							data.path.lineTo(x_start, offset);
-							ctx.fill(data.path);
+							drawAreaGraph(visible_chunks, model_view, proj, data.fill, data.key, data.density_key);
 						}
 					}
 				}
 				if (data.keys)
-					drawRectangles(ctx, visible_chunks, data.keys, data.colors, x_start, bin_size / screen_to_real, 0, canvas.height, data.amplification, data.density_key);
+					drawRectangles(visible_chunks, model_view, proj, data.colors, data.keys, data.density_key);
 			}
 	
-			if (zoom_area_start) {
-				let zoom_area_screen_start = (zoom_area_start - focus) / screen_to_real + canvas.width * 0.5;
-				let zoom_area_screen_end = view_mouse_x;
-				let zoom_area_screen_left = Math.min(zoom_area_screen_start, zoom_area_screen_end);
-				let zoom_area_screen_right = Math.max(zoom_area_screen_start, zoom_area_screen_end);
-				let zoom_area_screen_width = zoom_area_screen_right - zoom_area_screen_left;
-				ctx.fillStyle = "rgba(100, 100, 240, 0.5)";
-				if (zoom_area_screen_width < min_zoom_area_width)
-					ctx.fillStyle = "rgba(100, 100, 240, 0.25)";
-				ctx.fillRect(zoom_area_screen_left, 0, zoom_area_screen_width, canvas.height);
-			}
+			drawZoomArea(clip);
 		}
 	}
 }
