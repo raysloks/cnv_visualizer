@@ -2,7 +2,7 @@
 
 #SBATCH -A sens2017106
 #SBATCH -p core
-#SBATCH -n 3
+#SBATCH -n 4
 #SBATCH -t 1-00:00:00
 #SBATCH -J cnv_visualizer_data_generator
 
