@@ -21,7 +21,9 @@ class Chunk {
 				}
 			}
 			let buffer_data = new Float32Array(buffer_array);
-			return createBuffer(gl, buffer_data);
+			let buffer = createBuffer(gl, buffer_data);
+			buffer.vertex_count = buffer_array.length / 2;
+			return buffer;
 		} else {
 			let buffer_data = new Float32Array(this.size * 2);
 			let data = this.data[key];
@@ -29,7 +31,9 @@ class Chunk {
 				buffer_data[i * 2] = i * this.scale + this.offset;
 				buffer_data[i * 2 + 1] = data[i];
 			}
-			return createBuffer(gl, buffer_data);
+			let buffer = createBuffer(gl, buffer_data);
+			buffer.vertex_count = this.size;
+			return buffer;
 		}
 	}
 
@@ -75,7 +79,9 @@ class Chunk {
 			}
 
 			let buffer_data = new Float32Array(buffer_array);
-			return createBuffer(gl, buffer_data);
+			let buffer = createBuffer(gl, buffer_data);
+			buffer.vertex_count = buffer_array.length / 2;
+			return buffer;
 		} else {
 			let buffer_data = new Float32Array(this.size * 2);
 			let data = this.data[key];
@@ -83,7 +89,9 @@ class Chunk {
 				buffer_data[i * 2] = i * this.scale + this.offset;
 				buffer_data[i * 2 + 1] = data[i];
 			}
-			return createBuffer(gl, buffer_data);
+			let buffer = createBuffer(gl, buffer_data);
+			buffer.vertex_count = this.size;
+			return buffer;
 		}
 	}
 
@@ -153,7 +161,9 @@ class Chunk {
 			}
 
 			let buffer_data = new Float32Array(buffer_array);
-			return createBuffer(gl, buffer_data);
+			let buffer = createBuffer(gl, buffer_data);
+			buffer.vertex_count = buffer_array.size / 2;
+			return buffer;
 		} else {
 			let buffer_data = new Float32Array(this.size * 4);
 			let data = this.data[key];
@@ -164,7 +174,9 @@ class Chunk {
 				buffer_data[i * 4 + 2] = x;
 				buffer_data[i * 4 + 3] = 0.0;
 			}
-			return createBuffer(gl, buffer_data);
+			let buffer = createBuffer(gl, buffer_data);
+			buffer.vertex_count = this.size * 2;
+			return buffer;
 		}
 	}
 

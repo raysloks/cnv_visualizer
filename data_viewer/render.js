@@ -46,7 +46,8 @@ function drawLineGraph(chunks, model_view, proj, key, density_key) {
 		let graph_id = [chunk.id, key, density_key].join("");
 		if (!(graph_id in gl_line_buffers))
 			gl_line_buffers[graph_id] = chunk.getLineBuffer(gl, key, density_key);
-		gl.bindBuffer(gl.ARRAY_BUFFER, gl_line_buffers[graph_id].buffer);
+		let buffer = gl_line_buffers[graph_id];
+		gl.bindBuffer(gl.ARRAY_BUFFER, buffer.buffer);
 		gl.vertexAttribPointer(
 			shader.position,
 			2,
@@ -57,9 +58,9 @@ function drawLineGraph(chunks, model_view, proj, key, density_key) {
 		gl.enableVertexAttribArray(shader.position);
 
 		if (density_key)
-			gl.drawArrays(gl.LINES, 0, chunk.size * 2);
+			gl.drawArrays(gl.LINES, 0, buffer.vertex_count);
 		else
-			gl.drawArrays(gl.LINE_STRIP, 0, chunk.size);
+			gl.drawArrays(gl.LINE_STRIP, 0, buffer.vertex_count);
 	}
 }
 
@@ -79,7 +80,8 @@ function drawAreaGraph(chunks, model_view, proj, color, key, density_key) {
 		let graph_id = [chunk.id, key, density_key].join("");
 		if (!(graph_id in gl_area_buffers))
 			gl_area_buffers[graph_id] = chunk.getAreaBuffer(gl, key, density_key);
-		gl.bindBuffer(gl.ARRAY_BUFFER, gl_area_buffers[graph_id].buffer);
+		let buffer = gl_area_buffers[graph_id];
+		gl.bindBuffer(gl.ARRAY_BUFFER, buffer.buffer);
 		gl.vertexAttribPointer(
 			shader.position,
 			2,
@@ -90,9 +92,9 @@ function drawAreaGraph(chunks, model_view, proj, color, key, density_key) {
 		gl.enableVertexAttribArray(shader.position);
 
 		if (density_key)
-			gl.drawArrays(gl.TRIANGLES, 0, chunk.size * 6);
+			gl.drawArrays(gl.TRIANGLES, 0, buffer.vertex_count);
 		else
-			gl.drawArrays(gl.TRIANGLE_STRIP, 0, chunk.size * 2);
+			gl.drawArrays(gl.TRIANGLE_STRIP, 0, buffer.vertex_count);
 	}
 }
 
@@ -112,7 +114,8 @@ function drawPointGraph(chunks, model_view, proj, key, density_key) {
 		let graph_id = [chunk.id, key, density_key].join("");
 		if (!(graph_id in gl_point_buffers))
 			gl_point_buffers[graph_id] = chunk.getPointBuffer(gl, key, density_key);
-		gl.bindBuffer(gl.ARRAY_BUFFER, gl_point_buffers[graph_id].buffer);
+		let buffer = gl_point_buffers[graph_id];
+		gl.bindBuffer(gl.ARRAY_BUFFER, buffer.buffer);
 		gl.vertexAttribPointer(
 			shader.position,
 			2,
@@ -122,7 +125,7 @@ function drawPointGraph(chunks, model_view, proj, key, density_key) {
 			0);
 		gl.enableVertexAttribArray(shader.position);
 
-		gl.drawArrays(gl.POINTS, 0, chunk.size);
+		gl.drawArrays(gl.POINTS, 0, buffer.vertex_count);
 	}
 
 }
@@ -347,10 +350,6 @@ function render(repaint) {
 		canvas.height = rect.height;
 	}
 
-	if (repaint) {
-		console.log("REPAINT");
-	}
-
 	// if (false)
 	{
 		let overview_clips = clips.filter(e => e.type == "overview");
@@ -422,10 +421,6 @@ function render(repaint) {
 				}
 			}
 			if (clip.render_area) {
-
-				let current_chromosome_overview_a = overview_clips.find(e => e.subclips).subclips[chromosome_index].render_area.parentNode;
-				let zoom_overlay = current_chromosome_overview_a.querySelector(".overview_zoom_overlay");
-				let zoom_rect = zoom_overlay.getBoundingClientRect();
 				
 				let repaint_clip = repaint;
 
@@ -461,6 +456,13 @@ function render(repaint) {
 
 				gl.enable(gl.BLEND);
 				gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+				if (chromosome_index == null)
+					continue;
+
+				let current_chromosome_overview_a = overview_clips.find(e => e.subclips).subclips[chromosome_index].render_area.parentNode;
+				let zoom_overlay = current_chromosome_overview_a.querySelector(".overview_zoom_overlay");
+				let zoom_rect = zoom_overlay.getBoundingClientRect();
 
 				const line_width_left = 2.0 / Math.cos(Math.PI / 2.0 - Math.atan(rect.height / zoom_rect.left));
 				const line_width_right = 2.0 / Math.cos(Math.PI / 2.0 - Math.atan(rect.height / (rect.right - zoom_rect.right)));
@@ -819,13 +821,14 @@ function render(repaint) {
 			if (calls) {
 				if (chr.name in calls.chromosomes) {
 					for (const record of calls.chromosomes[chr.name].records) {
-						let screen_pos = (record.pos - focus) / screen_to_real + canvas.width * 0.5;
-						let screen_end = (record.info["END"] - focus) / screen_to_real + canvas.width * 0.5;
-						// if (record.alt == "<DEL>")
-						// 	ctx.fillStyle = "rgba(200, 10, 10, 0.25)";
-						// if (record.alt == "<DUP>")
-						// 	ctx.fillStyle = "rgba(10, 200, 10, 0.25)";
-						// ctx.fillRect(screen_pos, 0, screen_end - screen_pos, canvas.height);
+						let screen_pos = (record.pos - focus) / screen_to_real + clip.rect.w * 0.5;
+						let screen_end = (record.info["END"] - focus) / screen_to_real + clip.rect.w * 0.5;
+						let color = [1.0, 0.0, 1.0, 0.25];
+						if (record.alt == "<DEL>")
+							color = [0.8, 0.1, 0.1, 0.25];
+						if (record.alt == "<DUP>")
+							color = [0.1, 0.8, 0.1, 0.25];
+						drawRectangle(clip, screen_pos, 0, screen_end - screen_pos, clip.rect.h, color);
 					}
 				}
 			}
