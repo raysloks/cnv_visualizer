@@ -11,6 +11,7 @@ class GenomeData
 {
 public:
     void save(const std::string& path, const std::string& template_path) const;
+	void save_gens(const std::string& path) const;
 
 	int addBafData(const VcfData& baf);
 

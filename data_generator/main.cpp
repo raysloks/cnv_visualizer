@@ -63,6 +63,7 @@ int main(int argc, char ** argv)
 	std::string bam_fname;
 
 	std::string test_chr_sizes_fname;
+	bool test_gens;
 
 	std::vector<CmdOption> options = {
 		CmdOption('h', "help", "Show this text.", 
@@ -75,6 +76,8 @@ int main(int argc, char ** argv)
 			"long desc", "help and example", std::vector<CmdValue>({ CmdValue(&bam_fname, true) })),
 		CmdOption('t', "test", "Generate fake testing data.", 
 			"long desc", "help and example", std::vector<CmdValue>({ CmdValue(&test_chr_sizes_fname, true) })),
+		CmdOption('g', "gens", "Generate fake testing data for Gens.",
+			"long desc", "helpeee", std::vector<CmdValue>({ CmdValue(&test_chr_sizes_fname, true), CmdValue(&test_gens) })),
 		CmdOption('a', "annotations-compile", "Create .ann files from a .gtf file.", 
 			"long desc here yada yada", "help and example here", std::vector<CmdValue>({ CmdValue(&compile_annotations_input, true), CmdValue(&compile_annotations_output, true) }))
 	};
@@ -258,7 +261,10 @@ int main(int argc, char ** argv)
 			std::cerr << "ERROR: failed to create a directory." << std::endl;*/
 
 		std::cout << "saving data to " << path << "..." << std::endl;
-		data.save(path, html_path);
+		if (test_gens)
+			data.save_gens(path);
+		else
+			data.save(path, html_path);
 		std::cout << "saved data to " << path << "." << std::endl;
 	}
 

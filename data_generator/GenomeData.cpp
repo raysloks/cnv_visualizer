@@ -75,6 +75,69 @@ void GenomeData::save(const std::string& path, const std::string& template_path)
 		thread.join();
 }
 
+const std::vector<std::string> gens_prefixes = {
+	"o",
+	"a",
+	"b",
+	"c",
+	"d"
+};
+
+const std::vector<int64_t> gens_bin_sizes = {
+	100000,
+	25000,
+	5000,
+	1000,
+	100
+};
+
+const std::vector<int64_t> gens_cov_sizes = {
+	28000,
+	110000,
+	550000,
+	2700000,
+	26400000
+};
+
+const std::vector<int64_t> gens_baf_sizes = {
+	47000,
+	188000,
+	754000,
+	1900000,
+	7500000
+};
+
+void GenomeData::save_gens(const std::string& path) const
+{
+	std::ofstream baf(path + "baf.bed", std::ofstream::trunc);
+	for (auto& chr : chromosomes)
+	{
+		for (size_t i = 0; i < 5; ++i)
+		{
+			for (size_t x = 0; x < gens_baf_sizes[i]; ++x)
+			{
+				int64_t pos = chr.offset + x * chr.chr_template.size / gens_bin_sizes[i];
+				if (x < chr.baf_data.size())
+					baf << gens_prefixes[i] << "_" << chr.chr_template.name << "\t" << (pos - 1) << "\t" << pos << "\t" << chr.baf_data[x].undersampled << "\n";
+			}
+		}
+	}
+
+	std::ofstream cov(path + "cov.bed", std::ofstream::trunc);
+	for (auto& chr : chromosomes)
+	{
+		for (size_t i = 0; i < 5; ++i)
+		{
+			for (size_t x = 0; x < gens_cov_sizes[i]; ++x)
+			{
+				int64_t pos = chr.offset + x * gens_bin_sizes[i];
+				if (x < chr.log2_coverage_data.size())
+					cov << gens_prefixes[i] << "_" << chr.chr_template.name << "\t" << (pos - 1) << "\t" << pos << "\t" << chr.log2_coverage_data[x].mean_log2 << "\n";
+			}
+		}
+	}
+}
+
 int GenomeData::addBafData(const VcfData& baf)
 {
 	if (chromosomes.empty())
