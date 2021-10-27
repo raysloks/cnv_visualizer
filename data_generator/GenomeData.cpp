@@ -114,9 +114,9 @@ void GenomeData::save_gens(const std::string& path) const
 	{
 		for (size_t i = 0; i < 5; ++i)
 		{
-			for (size_t x = 0; x < gens_baf_sizes[i]; ++x)
+			for (size_t x = 0; x < chr.chr_template.size / gens_bin_sizes[i]; ++x)
 			{
-				int64_t pos = chr.offset + x * chr.chr_template.size / gens_bin_sizes[i];
+				int64_t pos = chr.offset + x * gens_bin_sizes[i];
 				if (x < chr.baf_data.size())
 					baf << gens_prefixes[i] << "_" << chr.chr_template.name << "\t" << (pos - 1) << "\t" << pos << "\t" << chr.baf_data[x].undersampled << "\n";
 			}
@@ -128,7 +128,7 @@ void GenomeData::save_gens(const std::string& path) const
 	{
 		for (size_t i = 0; i < 5; ++i)
 		{
-			for (size_t x = 0; x < gens_cov_sizes[i]; ++x)
+			for (size_t x = 0; x < chr.chr_template.size / gens_bin_sizes[i]; ++x)
 			{
 				int64_t pos = chr.offset + x * gens_bin_sizes[i];
 				if (x < chr.log2_coverage_data.size())
