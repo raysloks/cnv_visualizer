@@ -29,6 +29,10 @@ void GenomeData::save(const std::string& path, const std::string& template_path)
 	doc.data["max_bin_size"] = std::to_string(max_bin_size);
 
 	std::vector<std::string> data_lines = {
+		"coverage_mean_log2",
+		"baf_undersampled"
+	};
+	/*std::vector<std::string> data_lines = {
 		"coverage_density_negative",
 		"coverage_mean_log2_negative",
 		"coverage_density_positive",
@@ -52,7 +56,7 @@ void GenomeData::save(const std::string& path, const std::string& template_path)
 		"base_c_density",
 		"base_g_density",
 		"base_t_density"
-	};
+	};*/
 	for (size_t i = 0; i < data_lines.size(); ++i)
 	{
 		doc.data["data_lines[" + std::to_string(i) + "]"] = data_lines[i];

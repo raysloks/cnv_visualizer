@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <functional>
 
 ChromosomeData ChromosomeData::shrink() const
 {
@@ -31,14 +32,14 @@ ChromosomeData ChromosomeData::shrink() const
 
 int chunk_size = 2048;
 
-template <class T>
-std::vector<float> extract(const std::vector<T>& input, size_t offset, float T::*member)
+template <class T, class F>
+std::vector<typename F::result_type> extract(const std::vector<T>& input, size_t offset, const F& function)
 {
-	std::vector<float> output(chunk_size);
+	std::vector<typename F::result_type> output(chunk_size);
 
 	for (size_t i = offset; i < input.size() && i < offset + chunk_size; ++i)
 	{
-		output[i - offset] = input[i].*member;
+		output[i - offset] = function(input[i]);
 	}
 
 	return output;
@@ -56,7 +57,7 @@ int ChromosomeData::save(const std::string& path, int max_scale) const
 
 	ChromosomeData shrunk_chr_data = *this; // unnecessary copy, but it's kinda awkward to avoid it
 	int expected_scale = shrunk_chr_data.scale;
-	
+
 	while (expected_scale < max_scale)
 	{
 		if (expected_scale >= 100)
@@ -68,9 +69,17 @@ int ChromosomeData::save(const std::string& path, int max_scale) const
 				// std::cout << fp << std::endl;
 				std::ofstream f(fp, std::ofstream::binary | std::ofstream::trunc);
 
-				dump_it(extract(shrunk_chr_data.log2_coverage_data, i, &CoverageData::mean_log2), f);
+				dump_it(extract(shrunk_chr_data.log2_coverage_data, i, std::function<int16_t(const CoverageData&)>([](const CoverageData& cov) {
+					if (cov.density == 0.0f)
+						return int16_t(0xffff);
+					return int16_t(cov.mean_log2 * 1000);
+				})), f);
 
-				dump_it(extract(shrunk_chr_data.baf_data, i, &BafData::undersampled), f);
+				dump_it(extract(shrunk_chr_data.baf_data, i, std::function<uint16_t(const BafData&)>([](const BafData& baf) {
+					if (baf.density == 0.0f)
+						return uint16_t(0xffff);
+					return uint16_t(baf.undersampled * 65534);
+				})), f);
 
 				// dump_it(extract(shrunk_chr_data.log2_coverage_data, i, &CoverageData::density_negative), f);
 				// dump_it(extract(shrunk_chr_data.log2_coverage_data, i, &CoverageData::mean_log2_negative), f);

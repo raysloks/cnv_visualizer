@@ -141,7 +141,7 @@ function check_update() {
 			chromosome_dropdown_current.innerHTML = chromosome_names[chromosome_index];
 			chromosome_dropdown_current.href = "#" + chromosome_names[chromosome_index];
 		}
-		
+
 		if (chromosome_index !== null) {
 			let current_chromosome_dropdown_a = document.getElementById("chromosome_dropdown_content").children[chromosome_index];
 			if (current_chromosome_dropdown_a.href != hash)
@@ -205,7 +205,7 @@ function tick_smooth_zoom(elapsed) {
 				let log_t = (1.0 - Math.exp(Math.log(og_rel) * linear_t)) / (1.0 - og_rel);
 				let last_log_t = (1.0 - Math.exp(Math.log(og_rel) * last_linear_t)) / (1.0 - og_rel);
 				let relative_log_t = (log_t - last_log_t) / (1.0 - last_log_t);
-	
+
 				focus = focus * (1.0 - relative_log_t) + smooth_zoom_target_focus * relative_log_t;
 				screen_to_real *= Math.exp(Math.log(smooth_zoom_target_screen_to_real / screen_to_real) * relative_linear_t);
 			} else {
